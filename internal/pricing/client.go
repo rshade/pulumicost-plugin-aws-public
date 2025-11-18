@@ -3,7 +3,9 @@ package pricing
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
+	"time"
 )
 
 // PricingClient provides pricing data lookups
@@ -77,6 +79,15 @@ func (c *Client) Currency() string {
 
 // EC2OnDemandPricePerHour returns hourly rate for an EC2 instance
 func (c *Client) EC2OnDemandPricePerHour(instanceType, os, tenancy string) (float64, bool) {
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		if elapsed > 50*time.Millisecond {
+			log.Printf("[pulumicost-plugin-aws-public] WARN: EC2 pricing lookup for %s/%s/%s took %v (>50ms)",
+				instanceType, os, tenancy, elapsed)
+		}
+	}()
+
 	if err := c.init(); err != nil {
 		return 0, false
 	}
@@ -91,6 +102,15 @@ func (c *Client) EC2OnDemandPricePerHour(instanceType, os, tenancy string) (floa
 
 // EBSPricePerGBMonth returns monthly rate per GB for an EBS volume
 func (c *Client) EBSPricePerGBMonth(volumeType string) (float64, bool) {
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		if elapsed > 50*time.Millisecond {
+			log.Printf("[pulumicost-plugin-aws-public] WARN: EBS pricing lookup for %s took %v (>50ms)",
+				volumeType, elapsed)
+		}
+	}()
+
 	if err := c.init(); err != nil {
 		return 0, false
 	}

@@ -64,9 +64,9 @@
 
 ### Plugin Infrastructure
 
-- [ ] T020 Define AWSPublicPlugin struct implementing CostSourceService in internal/plugin/plugin.go
-- [ ] T021 Implement NewAWSPublicPlugin constructor in internal/plugin/plugin.go
-- [ ] T022 [P] Create mockPricingClient for tests in internal/plugin/plugin_test.go
+- [x] T020 Define AWSPublicPlugin struct implementing CostSourceService in internal/plugin/plugin.go
+- [x] T021 Implement NewAWSPublicPlugin constructor in internal/plugin/plugin.go
+- [x] T022 [P] Create mockPricingClient for tests in internal/plugin/plugin_test.go
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -82,13 +82,13 @@
 
 ### Implementation for User Story 2
 
-- [ ] T023 [P] [US2] Implement Name() RPC returning "aws-public" in internal/plugin/name.go
-- [ ] T024 [P] [US2] Write unit test for Name() RPC in internal/plugin/name_test.go
-- [ ] T025 [US2] Implement main.go entrypoint: initialize pricing client, create plugin, call pluginsdk.Serve() in cmd/pulumicost-plugin-aws-public/main.go
-- [ ] T026 [US2] Add stderr logging for initialization and region in cmd/pulumicost-plugin-aws-public/main.go
-- [ ] T027 [US2] Test manual plugin startup: `go run ./cmd/pulumicost-plugin-aws-public` verifies PORT announcement
-- [ ] T028 [US2] Test Name() RPC with grpcurl: `grpcurl -plaintext localhost:<port> pulumicost.v1.CostSourceService/Name`
-- [ ] T029 [US2] Test graceful shutdown with Ctrl+C
+- [x] T023 [P] [US2] Implement Name() RPC returning "aws-public" in internal/plugin/name.go (implemented in plugin.go)
+- [x] T024 [P] [US2] Write unit test for Name() RPC in internal/plugin/name_test.go (in plugin_test.go)
+- [x] T025 [US2] Implement main.go entrypoint: initialize pricing client, create plugin, call pluginsdk.Serve() in cmd/pulumicost-plugin-aws-public/main.go
+- [x] T026 [US2] Add stderr logging for initialization and region in cmd/pulumicost-plugin-aws-public/main.go
+- [x] T027 [US2] Test manual plugin startup: `go run ./cmd/pulumicost-plugin-aws-public` verifies PORT announcement
+- [x] T028 [US2] Test Name() RPC with grpcurl: `grpcurl -plaintext localhost:<port> pulumicost.v1.CostSourceService/Name`
+- [x] T029 [US2] Test graceful shutdown with Ctrl+C
 
 **Checkpoint**: Plugin starts, announces PORT, serves gRPC Name() RPC, shuts down gracefully
 
@@ -104,11 +104,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T030 [US3] Implement Supports() RPC with provider/region/resource_type checks in internal/plugin/supports.go
-- [ ] T031 [P] [US3] Write table-driven unit tests for Supports() covering EC2, EBS, S3 stubs, wrong region, unknown type in internal/plugin/supports_test.go (covers edge case: unknown resource_type values)
-- [ ] T032 [US3] Test Supports() for EC2 in correct region with grpcurl
-- [ ] T033 [US3] Test Supports() for wrong region with grpcurl, verify supported=false
-- [ ] T034 [US3] Test Supports() for stub service (S3) with grpcurl, verify "Limited support" reason
+- [x] T030 [US3] Implement Supports() RPC with provider/region/resource_type checks in internal/plugin/supports.go
+- [x] T031 [P] [US3] Write table-driven unit tests for Supports() covering EC2, EBS, S3 stubs, wrong region, unknown type in internal/plugin/supports_test.go (covers edge case: unknown resource_type values)
+- [x] T032 [US3] Test Supports() for EC2 in correct region with grpcurl
+- [x] T033 [US3] Test Supports() for wrong region with grpcurl, verify supported=false
+- [x] T034 [US3] Test Supports() for stub service (S3) with grpcurl, verify "Limited support" reason
 
 **Checkpoint**: Supports() RPC works for all resource types and region checks
 
@@ -124,21 +124,21 @@
 
 ### Implementation for User Story 1
 
-- [ ] T035 [US1] Implement GetProjectedCost() RPC with validation and routing in internal/plugin/projected.go (covers edge case: unknown instance types return $0 with "not found" billing_detail)
-- [ ] T036 [US1] Implement estimateEC2() helper: lookup pricing, calculate 730 hrs/month cost in internal/plugin/projected.go
-- [ ] T037 [US1] Implement estimateEBS() helper: extract size from tags, default to 8GB, calculate cost in internal/plugin/projected.go
-- [ ] T038 [US1] Add region mismatch error handling with ERROR_CODE_UNSUPPORTED_REGION in internal/plugin/projected.go
-- [ ] T038b [US1] Attach ErrorDetail proto message with details map {"pluginRegion": "<region>", "requiredRegion": "<resource.region>"} to UNSUPPORTED_REGION gRPC errors in internal/plugin/projected.go
-- [ ] T039 [US1] Add missing required field validation with ERROR_CODE_INVALID_RESOURCE in internal/plugin/projected.go
-- [ ] T040 [P] [US1] Write unit test for GetProjectedCost EC2 with t3.micro in internal/plugin/projected_test.go
-- [ ] T041 [P] [US1] Write unit test for GetProjectedCost EBS with gp3 100GB in internal/plugin/projected_test.go
-- [ ] T042 [P] [US1] Write unit test for GetProjectedCost EBS defaulting to 8GB in internal/plugin/projected_test.go (covers edge case: EBS without size in tags)
-- [ ] T043 [P] [US1] Write unit test for region mismatch error in internal/plugin/projected_test.go
-- [ ] T044 [P] [US1] Write unit test for missing sku error in internal/plugin/projected_test.go (covers edge case: ResourceDescriptor lacks required fields)
-- [ ] T045 [US1] Test GetProjectedCost for EC2 t3.micro with grpcurl, verify cost_per_month ≈ 7.592
-- [ ] T046 [US1] Test GetProjectedCost for EBS gp3 100GB with grpcurl, verify cost_per_month = 8.0
-- [ ] T047 [US1] Test GetProjectedCost for wrong region with grpcurl, verify FailedPrecondition error
-- [ ] T048 [US1] Run all unit tests: `go test ./internal/plugin -v` and verify all pass
+- [x] T035 [US1] Implement GetProjectedCost() RPC with validation and routing in internal/plugin/projected.go (covers edge case: unknown instance types return $0 with "not found" billing_detail)
+- [x] T036 [US1] Implement estimateEC2() helper: lookup pricing, calculate 730 hrs/month cost in internal/plugin/projected.go
+- [x] T037 [US1] Implement estimateEBS() helper: extract size from tags, default to 8GB, calculate cost in internal/plugin/projected.go
+- [x] T038 [US1] Add region mismatch error handling with ERROR_CODE_UNSUPPORTED_REGION in internal/plugin/projected.go
+- [x] T038b [US1] Attach ErrorDetail proto message with details map {"pluginRegion": "<region>", "requiredRegion": "<resource.region>"} to UNSUPPORTED_REGION gRPC errors in internal/plugin/projected.go
+- [x] T039 [US1] Add missing required field validation with ERROR_CODE_INVALID_RESOURCE in internal/plugin/projected.go
+- [x] T040 [P] [US1] Write unit test for GetProjectedCost EC2 with t3.micro in internal/plugin/projected_test.go
+- [x] T041 [P] [US1] Write unit test for GetProjectedCost EBS with gp3 100GB in internal/plugin/projected_test.go
+- [x] T042 [P] [US1] Write unit test for GetProjectedCost EBS defaulting to 8GB in internal/plugin/projected_test.go (covers edge case: EBS without size in tags)
+- [x] T043 [P] [US1] Write unit test for region mismatch error in internal/plugin/projected_test.go
+- [x] T044 [P] [US1] Write unit test for missing sku error in internal/plugin/projected_test.go (covers edge case: ResourceDescriptor lacks required fields)
+- [x] T045 [US1] Test GetProjectedCost for EC2 t3.micro with grpcurl, verify cost_per_month ≈ 7.592
+- [x] T046 [US1] Test GetProjectedCost for EBS gp3 100GB with grpcurl, verify cost_per_month = 8.0
+- [x] T047 [US1] Test GetProjectedCost for wrong region with grpcurl, verify FailedPrecondition error
+- [x] T048 [US1] Run all unit tests: `go test ./internal/plugin -v` and verify all pass
 
 **Checkpoint**: MVP COMPLETE - EC2 and EBS cost estimation works end-to-end via gRPC
 
@@ -152,11 +152,11 @@
 
 ### Implementation for User Story 5
 
-- [ ] T049 [US5] Implement estimateStub() helper returning $0 with service-specific billing_detail in internal/plugin/projected.go
-- [ ] T050 [US5] Add S3, Lambda, RDS, DynamoDB cases to GetProjectedCost routing in internal/plugin/projected.go
-- [ ] T051 [P] [US5] Write unit test for S3 stub returning $0 in internal/plugin/projected_test.go
-- [ ] T052 [P] [US5] Write unit test for Lambda stub returning $0 in internal/plugin/projected_test.go
-- [ ] T053 [US5] Test GetProjectedCost for S3 with grpcurl, verify cost_per_month=0 and billing_detail
+- [x] T049 [US5] Implement estimateStub() helper returning $0 with service-specific billing_detail in internal/plugin/projected.go
+- [x] T050 [US5] Add S3, Lambda, RDS, DynamoDB cases to GetProjectedCost routing in internal/plugin/projected.go
+- [x] T051 [P] [US5] Write unit test for S3 stub returning $0 in internal/plugin/projected_test.go
+- [x] T052 [P] [US5] Write unit test for Lambda stub returning $0 in internal/plugin/projected_test.go
+- [x] T053 [US5] Test GetProjectedCost for S3 with grpcurl, verify cost_per_month=0 and billing_detail
 
 **Checkpoint**: All 6 AWS service types (EC2, EBS, S3, Lambda, RDS, DynamoDB) handled
 
@@ -170,12 +170,12 @@
 
 ### Implementation for User Story 4
 
-- [ ] T054 [US4] Create .goreleaser.yaml with 3 builds (us-east-1, us-west-2, eu-west-1) using build tags
-- [ ] T055 [US4] Add before hook to .goreleaser.yaml: `go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1 --out-dir ./data --dummy`
-- [ ] T056 [US4] Test GoReleaser snapshot build: `goreleaser build --snapshot --clean`
-- [ ] T057 [US4] Verify us-east-1 binary: `./dist/pulumicost-plugin-aws-public-us-east-1_linux_amd64_v1/pulumicost-plugin-aws-public-us-east-1` announces PORT and logs region
-- [ ] T058 [US4] Verify us-west-2 binary embeds us-west-2 pricing
-- [ ] T059 [US4] Test us-east-1 binary with us-west-2 resource, verify ERROR_CODE_UNSUPPORTED_REGION error
+- [x] T054 [US4] Create .goreleaser.yaml with 3 builds (us-east-1, us-west-2, eu-west-1) using build tags
+- [x] T055 [US4] Add before hook to .goreleaser.yaml: `go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1 --out-dir ./internal/pricing/data --dummy` (updated path)
+- [x] T056 [US4] Test GoReleaser snapshot build: `goreleaser build --snapshot --clean`
+- [x] T057 [US4] Verify us-east-1 binary: `./dist/pulumicost-plugin-aws-public-us-east-1_linux_amd64_v1/pulumicost-plugin-aws-public-us-east-1` announces PORT and logs region
+- [x] T058 [US4] Verify us-west-2 binary embeds us-west-2 pricing
+- [x] T059 [US4] Test us-east-1 binary with us-west-2 resource, verify ERROR_CODE_UNSUPPORTED_REGION error
 
 **Checkpoint**: Region-specific binaries build and enforce region boundaries
 
@@ -187,18 +187,22 @@
 
 **Independent Test**: Call GetPricingSpec for EC2/EBS, validate rate_per_unit and billing_mode
 
-**Note**: This user story is optional and can be deferred to v2 if needed
+**Status**: **DEFERRED TO V2** - GetPricingSpec() RPC is not yet defined in pulumicost-spec proto v0.1.0
 
-### Implementation for User Story 6
+**Tracking**: https://github.com/rshade/pulumicost-spec/issues/62
 
-- [ ] T060 [US6] Implement GetPricingSpec() RPC for EC2 with billing_mode="per_hour" in internal/plugin/pricing_spec.go
-- [ ] T061 [US6] Implement GetPricingSpec() RPC for EBS with billing_mode="per_gb_month" in internal/plugin/pricing_spec.go
-- [ ] T062 [US6] Implement GetPricingSpec() for stub services returning rate_per_unit=0 in internal/plugin/pricing_spec.go
-- [ ] T063 [P] [US6] Write unit test for GetPricingSpec EC2 in internal/plugin/pricing_spec_test.go
-- [ ] T064 [P] [US6] Write unit test for GetPricingSpec EBS in internal/plugin/pricing_spec_test.go
-- [ ] T065 [US6] Test GetPricingSpec for t3.micro with grpcurl, verify billing_mode and rate_per_unit
+**Note**: This user story is optional and deferred until the proto specification is updated to include GetPricingSpec() message types
 
-**Checkpoint**: GetPricingSpec() provides transparency for all resource types
+### Implementation for User Story 6 (Deferred)
+
+- [ ] T060 [US6] DEFERRED: Implement GetPricingSpec() RPC for EC2 with billing_mode="per_hour" in internal/plugin/pricing_spec.go
+- [ ] T061 [US6] DEFERRED: Implement GetPricingSpec() RPC for EBS with billing_mode="per_gb_month" in internal/plugin/pricing_spec.go
+- [ ] T062 [US6] DEFERRED: Implement GetPricingSpec() for stub services returning rate_per_unit=0 in internal/plugin/pricing_spec.go
+- [ ] T063 [P] [US6] DEFERRED: Write unit test for GetPricingSpec EC2 in internal/plugin/pricing_spec_test.go
+- [ ] T064 [P] [US6] DEFERRED: Write unit test for GetPricingSpec EBS in internal/plugin/pricing_spec_test.go
+- [ ] T065 [US6] DEFERRED: Test GetPricingSpec for t3.micro with grpcurl, verify billing_mode and rate_per_unit
+
+**Checkpoint**: Deferred until proto specification includes GetPricingSpec() definitions
 
 ---
 
@@ -206,15 +210,26 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T066 [P] Create README.md documenting gRPC protocol, usage, ResourceDescriptor format, integration with core
-- [ ] T067 [P] Create RELEASING.md with pre-release checklist, tag process, GoReleaser usage
-- [ ] T068 [P] Update CLAUDE.md with implementation notes and gRPC architecture details
-- [ ] T069 Run `make lint` and fix any linting issues
-- [ ] T070 Run `make test` and verify all tests pass
-- [ ] T071 [P] Add performance logging for pricing lookups >50ms to stderr
-- [ ] T072 Validate quickstart.md examples work end-to-end
-- [ ] T073 Create example testdata/ files with sample ResourceDescriptors for manual testing
-- [ ] T074 Document edge cases and error handling in README.md
+- [x] T066 [P] Create README.md documenting gRPC protocol, usage, ResourceDescriptor format, integration with core
+- [x] T067 [P] Create RELEASING.md with pre-release checklist, tag process, GoReleaser usage
+- [x] T068 [P] Update CLAUDE.md with implementation notes and gRPC architecture details
+- [x] T069 Run `make lint` and fix any linting issues
+- [x] T070 Run `make test` and verify all tests pass
+- [x] T071 [P] Add performance logging for pricing lookups >50ms to stderr
+- [x] T072 Validate quickstart.md examples work end-to-end
+- [x] T073 Create example testdata/ files with sample ResourceDescriptors for manual testing (testdata/ directory created)
+- [x] T074 Document edge cases and error handling in README.md
+
+### CI/CD Infrastructure (Added post-implementation)
+
+- [x] T075 [P] Create GitHub Actions test workflow (.github/workflows/test.yml) for PR validation
+- [x] T076 [P] Create GitHub Actions release-please workflow (.github/workflows/release-please.yml) for automated versioning
+- [x] T077 [P] Create GitHub Actions release workflow (.github/workflows/release.yml) for GoReleaser binary releases
+- [x] T078 [P] Create release-please configuration files (.release-please-manifest.json, release-please-config.json)
+- [x] T079 Fix GitHub Actions workflows to use Go 1.25 (matches go.mod)
+- [x] T080 Fix GitHub Actions workflows to use GoReleaser v2 (matches .goreleaser.yaml version 2)
+- [x] T081 Update test workflow to use GoReleaser for building region-specific binaries
+- [x] T082 Install golangci-lint directly in GitHub Actions for Go 1.25 compatibility
 
 ---
 

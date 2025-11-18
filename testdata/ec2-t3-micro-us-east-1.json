@@ -1,0 +1,9 @@
+{
+  "resource": {
+    "provider": "aws",
+    "resource_type": "ec2",
+    "sku": "t3.micro",
+    "region": "us-east-1",
+    "tags": {}
+  }
+}
