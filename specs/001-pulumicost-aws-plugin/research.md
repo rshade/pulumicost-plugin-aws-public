@@ -446,7 +446,7 @@ grpcurl -plaintext \
 ## Conclusion
 
 All Technical Context requirements from plan.md are resolved:
-- ✅ Language/Version: Go 1.21+
+- ✅ Language/Version: Go 1.25+
 - ✅ Primary Dependencies: pulumicost-spec (proto), pluginsdk, gRPC
 - ✅ Testing: go test with table-driven tests, mockPricingClient
 - ✅ Build Tooling: GoReleaser with build tags

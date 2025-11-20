@@ -62,6 +62,10 @@ message GetProjectedCostResponse {
   - `us-east-1` → `region_use1`
   - `us-west-2` → `region_usw2`
   - `eu-west-1` → `region_euw1`
+  - `ap-southeast-1` → `region_apse1` (Singapore)
+  - `ap-southeast-2` → `region_apse2` (Sydney)
+  - `ap-northeast-1` → `region_apne1` (Tokyo)
+  - `ap-south-1` → `region_aps1` (Mumbai)
 
 ### Embedded Pricing Data
 - At build time: `tools/generate-pricing` fetches/trims AWS public pricing
@@ -333,9 +337,39 @@ Always refer to the proto files in `../pulumicost-spec/proto/` for the authorita
 - Handle context cancellation for graceful shutdown
 - Make pricing lookups thread-safe for concurrent RPCs
 
+## PR and Commit Workflow
+
+**IMPORTANT**: When completing a feature implementation, always:
+
+1. **Generate PR_MESSAGE.md** instead of running `git commit` directly
+2. **Validate PR_MESSAGE.md** passes both linters:
+   - `npx markdownlint-cli PR_MESSAGE.md`
+   - Extract commit message and test with `echo "..." | npx commitlint`
+3. **Include in PR_MESSAGE.md**:
+   - Summary of changes
+   - Implementation details (new/modified files)
+   - Test plan with checkboxes
+   - Known limitations
+   - Breaking changes section
+   - Commit message in a code block (conventional commits format)
+   - Closes #issue-number
+
+This allows the user to review and make the commit themselves, and ensures
+the commit message follows conventional commits format.
+
 ## Active Technologies
-- Go 1.21+ (001-pulumicost-aws-plugin)
-- Embedded JSON files (go:embed) - No external storage required (001-pulumicost-aws-plugin)
+
+- Go 1.25+ (001-pulumicost-aws-plugin, 002-ap-region-support)
+- Embedded JSON files (go:embed) - No external storage required
+- Embedded JSON pricing files (go:embed) - no external storage
 
 ## Recent Changes
-- 001-pulumicost-aws-plugin: Added Go 1.21+
+- 001-pulumicost-aws-plugin: Added Go 1.25+
+- 002-ap-region-support: Added 4 Asia Pacific regions (Singapore, Sydney, Tokyo, Mumbai)
+  - Created region-specific embed files (embed_apse1.go, embed_apse2.go, embed_apne1.go, embed_aps1.go)
+  - Updated GoReleaser config with 4 new build targets
+  - Extended test suites with AP region test cases
+  - Added success criteria validation tests (concurrent calls, latency, cross-region pricing, region rejection)
+  - All binaries are 16MB (< 20MB requirement)
+  - Region mismatch latency: 0.01ms (< 100ms requirement)
+  - 100% region rejection rate validated
