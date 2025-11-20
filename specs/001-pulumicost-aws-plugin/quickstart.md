@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-1. **Go 1.21+** installed
+1. **Go 1.25+** installed
 2. **Git** for cloning dependencies
 3. **grpcurl** for manual gRPC testing
 4. **make** for build automation

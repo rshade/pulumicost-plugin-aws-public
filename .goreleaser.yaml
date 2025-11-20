@@ -3,7 +3,7 @@ version: 2
 before:
   hooks:
     # Generate pricing data for all regions before building
-    - go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1 --out-dir ./internal/pricing/data --dummy
+    - go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1,ap-southeast-1,ap-southeast-2,ap-northeast-1,ap-south-1 --out-dir ./internal/pricing/data --dummy
 
 builds:
   # us-east-1 binary
@@ -57,6 +57,78 @@ builds:
       - arm64
     tags:
       - region_euw1
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  # ap-southeast-1 binary
+  - id: ap-southeast-1
+    main: ./cmd/pulumicost-plugin-aws-public
+    binary: pulumicost-plugin-aws-public-ap-southeast-1
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - region_apse1
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  # ap-southeast-2 binary
+  - id: ap-southeast-2
+    main: ./cmd/pulumicost-plugin-aws-public
+    binary: pulumicost-plugin-aws-public-ap-southeast-2
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - region_apse2
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  # ap-northeast-1 binary
+  - id: ap-northeast-1
+    main: ./cmd/pulumicost-plugin-aws-public
+    binary: pulumicost-plugin-aws-public-ap-northeast-1
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - region_apne1
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  # ap-south-1 binary
+  - id: ap-south-1
+    main: ./cmd/pulumicost-plugin-aws-public
+    binary: pulumicost-plugin-aws-public-ap-south-1
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - region_aps1
     ldflags:
       - -s -w -X main.version={{.Version}}
 

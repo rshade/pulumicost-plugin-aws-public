@@ -11,7 +11,7 @@ Implement a gRPC-based PulumiCost plugin that provides AWS cost estimates using 
 
 ## Technical Context
 
-**Language/Version**: Go 1.21+
+**Language/Version**: Go 1.25+
 **Primary Dependencies**:
 - `github.com/rshade/pulumicost-spec/sdk/go/proto/pulumicost/v1` (proto definitions)
 - `github.com/rshade/pulumicost-core/pkg/pluginsdk` (plugin SDK and Serve function)

@@ -30,9 +30,18 @@ This plugin provides monthly cost estimates for AWS resources without requiring 
 
 Each region has its own binary to minimize size and ensure accurate pricing:
 
-- `pulumicost-plugin-aws-public-us-east-1`
-- `pulumicost-plugin-aws-public-us-west-2`
-- `pulumicost-plugin-aws-public-eu-west-1`
+**US Regions:**
+- `pulumicost-plugin-aws-public-us-east-1` (US East - N. Virginia)
+- `pulumicost-plugin-aws-public-us-west-2` (US West - Oregon)
+
+**Europe Regions:**
+- `pulumicost-plugin-aws-public-eu-west-1` (EU - Ireland)
+
+**Asia Pacific Regions:**
+- `pulumicost-plugin-aws-public-ap-southeast-1` (Asia Pacific - Singapore)
+- `pulumicost-plugin-aws-public-ap-southeast-2` (Asia Pacific - Sydney)
+- `pulumicost-plugin-aws-public-ap-northeast-1` (Asia Pacific - Tokyo)
+- `pulumicost-plugin-aws-public-ap-south-1` (Asia Pacific - Mumbai)
 
 ### Cost Estimation
 
@@ -63,11 +72,27 @@ go build -tags region_use1 -o pulumicost-plugin-aws-public-us-east-1 ./cmd/pulum
 ### Using GoReleaser
 
 ```bash
-# Generate pricing data
-go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1 --out-dir ./internal/pricing/data --dummy
+# Generate pricing data for all supported regions
+go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1,ap-southeast-1,ap-southeast-2,ap-northeast-1,ap-south-1 --out-dir ./internal/pricing/data --dummy
 
-# Build all region binaries
+# Build all region binaries (7 regions × 3 OS × 2 architectures = 42 artifacts)
 goreleaser build --snapshot --clean
+```
+
+### Building Individual AP Region Binaries
+
+```bash
+# Singapore (ap-southeast-1)
+go build -tags region_apse1 -o pulumicost-plugin-aws-public-ap-southeast-1 ./cmd/pulumicost-plugin-aws-public
+
+# Sydney (ap-southeast-2)
+go build -tags region_apse2 -o pulumicost-plugin-aws-public-ap-southeast-2 ./cmd/pulumicost-plugin-aws-public
+
+# Tokyo (ap-northeast-1)
+go build -tags region_apne1 -o pulumicost-plugin-aws-public-ap-northeast-1 ./cmd/pulumicost-plugin-aws-public
+
+# Mumbai (ap-south-1)
+go build -tags region_aps1 -o pulumicost-plugin-aws-public-ap-south-1 ./cmd/pulumicost-plugin-aws-public
 ```
 
 ## Usage
@@ -154,6 +179,27 @@ message ResourceDescriptor {
 }
 ```
 
+### Example: AP Region (Singapore)
+
+```json
+{
+  "provider": "aws",
+  "resource_type": "ec2",
+  "sku": "t3.micro",
+  "region": "ap-southeast-1"
+}
+```
+
+**Response:**
+```json
+{
+  "cost_per_month": 8.468,
+  "unit_price": 0.0116,
+  "currency": "USD",
+  "billing_detail": "On-demand Linux, Shared tenancy, 730 hrs/month"
+}
+```
+
 ## gRPC Service API
 
 ### Name()
@@ -219,7 +265,7 @@ Returned when ResourceDescriptor is missing required fields.
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.25+
 - golangci-lint
 - goreleaser (optional, for releases)
 

@@ -255,7 +255,7 @@ A PulumiCost user wants to understand how costs are calculated for each resource
 
 ## Dependencies
 
-- Go programming language and toolchain (version 1.21 or later)
+- Go programming language and toolchain (version 1.25 or later)
 - pulumicost-spec repository for proto definitions
 - pulumicost-core/pkg/pluginsdk for plugin SDK and Serve() function
 - gRPC and protobuf Go packages
