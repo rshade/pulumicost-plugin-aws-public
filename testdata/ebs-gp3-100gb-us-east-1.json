@@ -1,0 +1,11 @@
+{
+  "resource": {
+    "provider": "aws",
+    "resource_type": "ebs",
+    "sku": "gp3",
+    "region": "us-east-1",
+    "tags": {
+      "size": "100"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "resource": {
+    "provider": "aws",
+    "resource_type": "s3",
+    "sku": "standard",
+    "region": "us-east-1",
+    "tags": {}
+  }
+}

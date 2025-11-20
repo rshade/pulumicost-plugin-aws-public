@@ -1,0 +1,9 @@
+{
+  "resource": {
+    "provider": "aws",
+    "resource_type": "ebs",
+    "sku": "gp2",
+    "region": "us-east-1",
+    "tags": {}
+  }
+}

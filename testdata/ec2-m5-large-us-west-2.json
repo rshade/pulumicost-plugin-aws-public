@@ -1,0 +1,9 @@
+{
+  "resource": {
+    "provider": "aws",
+    "resource_type": "ec2",
+    "sku": "m5.large",
+    "region": "us-west-2",
+    "tags": {}
+  }
+}
