@@ -3,7 +3,7 @@ module github.com/rshade/pulumicost-plugin-aws-public
 go 1.25.4
 
 require (
-	github.com/rshade/pulumicost-core v0.0.0-20251118020642-b2ad29fff1ef
+	github.com/rshade/pulumicost-core v0.0.0-20251118114717-4680d9c9aab5
 	github.com/rshade/pulumicost-spec v0.1.0
 	google.golang.org/grpc v1.77.0
 )
