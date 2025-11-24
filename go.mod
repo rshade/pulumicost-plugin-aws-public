@@ -4,7 +4,7 @@ go 1.25.4
 
 require (
 	github.com/rshade/pulumicost-core v0.0.0-20251118114717-4680d9c9aab5
-	github.com/rshade/pulumicost-spec v0.1.0
+	github.com/rshade/pulumicost-spec v0.3.0
 	google.golang.org/grpc v1.77.0
 )
 
