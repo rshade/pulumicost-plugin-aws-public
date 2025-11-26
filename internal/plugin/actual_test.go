@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"github.com/rs/zerolog"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ func (m *mockPricingClientActual) EBSPricePerGBMonth(volumeType string) (float64
 }
 
 func newTestPluginForActual() *AWSPublicPlugin {
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
 	return NewAWSPublicPlugin("us-east-1", &mockPricingClientActual{
 		region: "us-east-1",
 		ec2Prices: map[string]float64{
@@ -46,7 +48,7 @@ func newTestPluginForActual() *AWSPublicPlugin {
 			"gp3": 0.08, // $0.08/GB-month
 			"gp2": 0.10, // $0.10/GB-month
 		},
-	})
+	}, logger)
 }
 
 // makeResourceJSON creates a JSON-encoded ResourceDescriptor for testing.

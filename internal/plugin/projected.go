@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
+	"github.com/rshade/pulumicost-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/pulumicost-spec/sdk/go/proto/pulumicost/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,15 +19,22 @@ const (
 
 // GetProjectedCost estimates the monthly cost for the given resource.
 func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
+	start := time.Now()
+	traceID := p.getTraceID(ctx)
+
 	if req == nil || req.Resource == nil {
-		return nil, status.Error(codes.InvalidArgument, "missing resource descriptor")
+		err := status.Error(codes.InvalidArgument, "missing resource descriptor")
+		p.logError(ctx, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		return nil, err
 	}
 
 	resource := req.Resource
 
 	// FR-029: Validate required fields
 	if resource.Provider == "" || resource.ResourceType == "" || resource.Sku == "" || resource.Region == "" {
-		return nil, status.Error(codes.InvalidArgument, "resource descriptor missing required fields (provider, resource_type, sku, region)")
+		err := status.Error(codes.InvalidArgument, "resource descriptor missing required fields (provider, resource_type, sku, region)")
+		p.logError(ctx, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		return nil, err
 	}
 
 	// FR-027 & FR-028: Check region match
@@ -46,31 +55,54 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 		// Return error with details
 		st := status.New(codes.FailedPrecondition, errDetail.Message)
 		st, _ = st.WithDetails(errDetail)
+		p.logError(ctx, "GetProjectedCost", st.Err(), pbc.ErrorCode_ERROR_CODE_UNSUPPORTED_REGION)
 		return nil, st.Err()
 	}
 
 	// Route to appropriate estimator based on resource type
+	var resp *pbc.GetProjectedCostResponse
+	var err error
+
 	switch resource.ResourceType {
 	case "ec2":
-		return p.estimateEC2(ctx, resource)
+		resp, err = p.estimateEC2(ctx, resource)
 	case "ebs":
-		return p.estimateEBS(ctx, resource)
+		resp, err = p.estimateEBS(ctx, resource)
 	case "s3", "lambda", "rds", "dynamodb":
-		return p.estimateStub(ctx, resource)
+		resp, err = p.estimateStub(ctx, resource)
 	default:
 		// Unknown resource type - return $0 with explanation
-		return &pbc.GetProjectedCostResponse{
-			CostPerMonth: 0,
-			UnitPrice:    0,
-			Currency:     "USD",
+		resp = &pbc.GetProjectedCostResponse{
+			CostPerMonth:  0,
+			UnitPrice:     0,
+			Currency:      "USD",
 			BillingDetail: fmt.Sprintf("Resource type %q not supported for cost estimation", resource.ResourceType),
-		}, nil
+		}
 	}
+
+	if err != nil {
+		p.logError(ctx, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_UNSPECIFIED)
+		return nil, err
+	}
+
+	// Log successful completion with all required fields
+	p.logger.Info().
+		Str(pluginsdk.FieldTraceID, traceID).
+		Str(pluginsdk.FieldOperation, "GetProjectedCost").
+		Str(pluginsdk.FieldResourceType, resource.ResourceType).
+		Str("aws_service", resource.ResourceType).
+		Str("aws_region", resource.Region).
+		Float64(pluginsdk.FieldCostMonthly, resp.CostPerMonth).
+		Int64(pluginsdk.FieldDurationMs, time.Since(start).Milliseconds()).
+		Msg("cost calculated")
+
+	return resp, nil
 }
 
 // estimateEC2 calculates the projected monthly cost for an EC2 instance.
 func (p *AWSPublicPlugin) estimateEC2(ctx context.Context, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
 	instanceType := resource.Sku
+	traceID := p.getTraceID(ctx)
 
 	// Hardcoded assumptions for v1
 	os := "Linux"
@@ -80,13 +112,27 @@ func (p *AWSPublicPlugin) estimateEC2(ctx context.Context, resource *pbc.Resourc
 	hourlyRate, found := p.pricing.EC2OnDemandPricePerHour(instanceType, os, tenancy)
 	if !found {
 		// FR-035: Unknown instance types return $0 with explanation
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "GetProjectedCost").
+			Str("instance_type", instanceType).
+			Msg("EC2 instance type not found in pricing data")
+
 		return &pbc.GetProjectedCostResponse{
-			CostPerMonth: 0,
-			UnitPrice:    0,
-			Currency:     "USD",
+			CostPerMonth:  0,
+			UnitPrice:     0,
+			Currency:      "USD",
 			BillingDetail: fmt.Sprintf("EC2 instance type %q not found in pricing data for %s/%s", instanceType, os, tenancy),
 		}, nil
 	}
+
+	// Debug log successful lookup
+	p.logger.Debug().
+		Str(pluginsdk.FieldTraceID, traceID).
+		Str(pluginsdk.FieldOperation, "GetProjectedCost").
+		Str("instance_type", instanceType).
+		Float64("unit_price", hourlyRate).
+		Msg("EC2 pricing lookup successful")
 
 	// FR-021: Calculate monthly cost (730 hours/month)
 	costPerMonth := hourlyRate * hoursPerMonth
@@ -103,6 +149,7 @@ func (p *AWSPublicPlugin) estimateEC2(ctx context.Context, resource *pbc.Resourc
 // estimateEBS calculates the projected monthly cost for an EBS volume.
 func (p *AWSPublicPlugin) estimateEBS(ctx context.Context, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
 	volumeType := resource.Sku
+	traceID := p.getTraceID(ctx)
 
 	// FR-041 & FR-042: Extract size from tags, default to 8GB
 	sizeGB := defaultEBSGB
@@ -126,6 +173,12 @@ func (p *AWSPublicPlugin) estimateEBS(ctx context.Context, resource *pbc.Resourc
 	ratePerGBMonth, found := p.pricing.EBSPricePerGBMonth(volumeType)
 	if !found {
 		// Unknown volume type - return $0 with explanation
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "GetProjectedCost").
+			Str("storage_type", volumeType).
+			Msg("EBS volume type not found in pricing data")
+
 		return &pbc.GetProjectedCostResponse{
 			CostPerMonth:  0,
 			UnitPrice:     0,
@@ -133,6 +186,14 @@ func (p *AWSPublicPlugin) estimateEBS(ctx context.Context, resource *pbc.Resourc
 			BillingDetail: fmt.Sprintf("EBS volume type %q not found in pricing data", volumeType),
 		}, nil
 	}
+
+	// Debug log successful lookup
+	p.logger.Debug().
+		Str(pluginsdk.FieldTraceID, traceID).
+		Str(pluginsdk.FieldOperation, "GetProjectedCost").
+		Str("storage_type", volumeType).
+		Float64("unit_price", ratePerGBMonth).
+		Msg("EBS pricing lookup successful")
 
 	// Calculate monthly cost
 	costPerMonth := ratePerGBMonth * float64(sizeGB)

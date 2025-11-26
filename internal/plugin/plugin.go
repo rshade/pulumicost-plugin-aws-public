@@ -4,10 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 	"github.com/rshade/pulumicost-plugin-aws-public/internal/pricing"
+	"github.com/rshade/pulumicost-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/pulumicost-spec/sdk/go/proto/pulumicost/v1"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -15,15 +20,50 @@ import (
 type AWSPublicPlugin struct {
 	region  string
 	pricing pricing.PricingClient
+	logger  zerolog.Logger
 }
 
 // NewAWSPublicPlugin creates a new AWSPublicPlugin instance.
 // The region should match the region for which pricing data is embedded.
-func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient) *AWSPublicPlugin {
+// The logger should be created using pluginsdk.NewPluginLogger for consistency.
+func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logger zerolog.Logger) *AWSPublicPlugin {
 	return &AWSPublicPlugin{
 		region:  region,
 		pricing: pricingClient,
+		logger:  logger,
 	}
+}
+
+// getTraceID extracts the trace_id from context or generates a UUID if not present.
+// This implements the workaround for missing interceptor support in ServeConfig.
+// See research.md U1 Remediation for details.
+func (p *AWSPublicPlugin) getTraceID(ctx context.Context) string {
+	// First try SDK helper (works if interceptor was somehow registered)
+	traceID := pluginsdk.TraceIDFromContext(ctx)
+	if traceID != "" {
+		return traceID
+	}
+
+	// Fallback: read directly from gRPC metadata
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if values := md.Get(pluginsdk.TraceIDMetadataKey); len(values) > 0 {
+			return values[0]
+		}
+	}
+
+	// Generate UUID if not present (per FR-003)
+	return uuid.New().String()
+}
+
+// logError logs an error with consistent fields for all handlers.
+func (p *AWSPublicPlugin) logError(ctx context.Context, operation string, err error, code pbc.ErrorCode) {
+	traceID := p.getTraceID(ctx)
+	p.logger.Error().
+		Str(pluginsdk.FieldTraceID, traceID).
+		Str(pluginsdk.FieldOperation, operation).
+		Str(pluginsdk.FieldErrorCode, code.String()).
+		Err(err).
+		Msg("request failed")
 }
 
 // Name returns the plugin name identifier.
@@ -38,17 +78,26 @@ func (p *AWSPublicPlugin) Name() string {
 // ResourceDescriptor. If ResourceId is empty, we fall back to extracting
 // resource info from the Tags map.
 func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualCostRequest) (*pbc.GetActualCostResponse, error) {
+	start := time.Now()
+	traceID := p.getTraceID(ctx)
+
 	// Validate request
 	if req == nil {
-		return nil, status.Error(codes.InvalidArgument, "missing request")
+		err := status.Error(codes.InvalidArgument, "missing request")
+		p.logError(ctx, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		return nil, err
 	}
 
 	// Validate timestamps (proto uses Start/End)
 	if req.Start == nil {
-		return nil, status.Error(codes.InvalidArgument, "missing Start timestamp")
+		err := status.Error(codes.InvalidArgument, "missing Start timestamp")
+		p.logError(ctx, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		return nil, err
 	}
 	if req.End == nil {
-		return nil, status.Error(codes.InvalidArgument, "missing End timestamp")
+		err := status.Error(codes.InvalidArgument, "missing End timestamp")
+		p.logError(ctx, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		return nil, err
 	}
 
 	// Parse timestamps
@@ -58,7 +107,9 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 	// Calculate runtime hours
 	runtimeHours, err := calculateRuntimeHours(fromTime, toTime)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid time range: %v", err))
+		err := status.Error(codes.InvalidArgument, fmt.Sprintf("invalid time range: %v", err))
+		p.logError(ctx, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		return nil, err
 	}
 
 	// Parse ResourceDescriptor from ResourceId (JSON) or Tags
@@ -69,6 +120,15 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 
 	// Handle zero duration - return $0 with single result
 	if runtimeHours == 0 {
+		p.logger.Info().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "GetActualCost").
+			Float64("cost_monthly", 0).
+			Float64("usage_amount", runtimeHours).
+			Str("usage_unit", "hours").
+			Int64(pluginsdk.FieldDurationMs, time.Since(start).Milliseconds()).
+			Msg("cost calculated")
+
 		return &pbc.GetActualCostResponse{
 			Results: []*pbc.ActualCostResult{{
 				Timestamp: req.Start,
@@ -86,6 +146,18 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 
 	// Apply formula: actual_cost = projected_monthly_cost × (runtime_hours / 730)
 	actualCost := projectedResp.CostPerMonth * (runtimeHours / hoursPerMonth)
+
+	p.logger.Info().
+		Str(pluginsdk.FieldTraceID, traceID).
+		Str(pluginsdk.FieldOperation, "GetActualCost").
+		Str(pluginsdk.FieldResourceType, resource.ResourceType).
+		Str("aws_service", resource.ResourceType).
+		Str("aws_region", resource.Region).
+		Float64("cost_monthly", actualCost).
+		Float64("usage_amount", runtimeHours).
+		Str("usage_unit", "hours").
+		Int64(pluginsdk.FieldDurationMs, time.Since(start).Milliseconds()).
+		Msg("cost calculated")
 
 	return &pbc.GetActualCostResponse{
 		Results: []*pbc.ActualCostResult{{
