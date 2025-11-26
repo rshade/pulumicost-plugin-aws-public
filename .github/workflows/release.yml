@@ -1,0 +1,49 @@
+name: GoReleaser
+
+# GoReleaser should run when release-please creates a new release.
+# Note: release-please creates tags via GitHub API, not git push,
+# so we trigger on the release event instead of push to tags.
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write # Needed for GoReleaser to upload artifacts to the release
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout the code at the tag
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+
+      # 2. Setup Go
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+
+      # 3. Generate pricing data for embedding
+      - name: Generate pricing data
+        run: make generate-pricing
+
+      # 4. Run GoReleaser
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
