@@ -631,7 +631,7 @@ func TestGetProjectedCost_CrossRegionPricingDifference(t *testing.T) {
 
 	for name, data := range regions {
 		mock := newMockPricingClient(data.region, "USD")
-	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+		logger := zerolog.New(nil).Level(zerolog.InfoLevel)
 		mock.ec2Prices["t3.micro/Linux/Shared"] = data.ec2Price
 		plugin := NewAWSPublicPlugin(data.region, mock, logger)
 
@@ -682,7 +682,7 @@ func TestSupports_RegionRejection(t *testing.T) {
 	for _, pluginRegion := range testRegions {
 		t.Run("Binary_"+pluginRegion, func(t *testing.T) {
 			mock := newMockPricingClient(pluginRegion, "USD")
-	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+			logger := zerolog.New(nil).Level(zerolog.InfoLevel)
 			plugin := NewAWSPublicPlugin(pluginRegion, mock, logger)
 
 			totalTests := 0

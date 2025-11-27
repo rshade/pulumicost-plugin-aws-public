@@ -41,6 +41,11 @@ func main() {
 		Str("aws_region", region).
 		Msg("plugin started")
 
+	// Log PORT env var if set (debug level for troubleshooting)
+	if port := os.Getenv("PORT"); port != "" {
+		logger.Debug().Str("port", port).Msg("using PORT from environment")
+	}
+
 	// Create plugin instance with logger
 	awsPlugin := plugin.NewAWSPublicPlugin(region, pricingClient, logger)
 

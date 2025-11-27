@@ -55,15 +55,33 @@ func (p *AWSPublicPlugin) getTraceID(ctx context.Context) string {
 	return uuid.New().String()
 }
 
-// logError logs an error with consistent fields for all handlers.
-func (p *AWSPublicPlugin) logError(ctx context.Context, operation string, err error, code pbc.ErrorCode) {
-	traceID := p.getTraceID(ctx)
+// logErrorWithID logs an error using a pre-captured trace ID.
+// Use this when you've already extracted the trace ID to ensure consistency
+// between error objects and log entries.
+func (p *AWSPublicPlugin) logErrorWithID(traceID, operation string, err error, code pbc.ErrorCode) {
 	p.logger.Error().
 		Str(pluginsdk.FieldTraceID, traceID).
 		Str(pluginsdk.FieldOperation, operation).
 		Str(pluginsdk.FieldErrorCode, code.String()).
 		Err(err).
 		Msg("request failed")
+}
+
+// newErrorWithID creates a gRPC error with trace_id in the error details using a pre-captured trace ID.
+// Use this when you've already extracted the trace ID to ensure consistency
+// between error objects and log entries.
+func (p *AWSPublicPlugin) newErrorWithID(traceID string, grpcCode codes.Code, msg string, errorCode pbc.ErrorCode) error {
+	errDetail := &pbc.ErrorDetail{
+		Code:    errorCode,
+		Message: msg,
+		Details: map[string]string{
+			"trace_id": traceID,
+		},
+	}
+
+	st := status.New(grpcCode, msg)
+	st, _ = st.WithDetails(errDetail)
+	return st.Err()
 }
 
 // Name returns the plugin name identifier.
@@ -83,20 +101,20 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 
 	// Validate request
 	if req == nil {
-		err := status.Error(codes.InvalidArgument, "missing request")
-		p.logError(ctx, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		err := p.newErrorWithID(traceID, codes.InvalidArgument, "missing request", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		p.logErrorWithID(traceID, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 		return nil, err
 	}
 
 	// Validate timestamps (proto uses Start/End)
 	if req.Start == nil {
-		err := status.Error(codes.InvalidArgument, "missing Start timestamp")
-		p.logError(ctx, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		err := p.newErrorWithID(traceID, codes.InvalidArgument, "missing Start timestamp", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		p.logErrorWithID(traceID, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 		return nil, err
 	}
 	if req.End == nil {
-		err := status.Error(codes.InvalidArgument, "missing End timestamp")
-		p.logError(ctx, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		err := p.newErrorWithID(traceID, codes.InvalidArgument, "missing End timestamp", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		p.logErrorWithID(traceID, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 		return nil, err
 	}
 
@@ -107,14 +125,15 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 	// Calculate runtime hours
 	runtimeHours, err := calculateRuntimeHours(fromTime, toTime)
 	if err != nil {
-		err := status.Error(codes.InvalidArgument, fmt.Sprintf("invalid time range: %v", err))
-		p.logError(ctx, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
-		return nil, err
+		statusErr := p.newErrorWithID(traceID, codes.InvalidArgument, fmt.Sprintf("invalid time range: %v", err), pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		p.logErrorWithID(traceID, "GetActualCost", statusErr, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		return nil, statusErr
 	}
 
 	// Parse ResourceDescriptor from ResourceId (JSON) or Tags
 	resource, err := p.parseResourceFromRequest(req)
 	if err != nil {
+		p.logErrorWithID(traceID, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 		return nil, err
 	}
 
@@ -139,8 +158,10 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 	}
 
 	// Get projected monthly cost using helper
-	projectedResp, err := p.getProjectedForResource(ctx, resource)
+	projectedResp, err := p.getProjectedForResource(traceID, resource)
 	if err != nil {
+		// Note: Use UNSPECIFIED as the error could be various types from projected cost calculation
+		p.logErrorWithID(traceID, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_UNSPECIFIED)
 		return nil, err
 	}
 

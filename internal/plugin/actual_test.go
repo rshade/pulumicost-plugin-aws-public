@@ -3,10 +3,11 @@ package plugin
 import (
 	"context"
 	"encoding/json"
-	"github.com/rs/zerolog"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	pbc "github.com/rshade/pulumicost-spec/sdk/go/proto/pulumicost/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -458,17 +459,74 @@ func BenchmarkGetActualCost(b *testing.B) {
 	}
 }
 
-// containsString checks if substr is in s.
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
-}
+// TestGetActualCost_ConcurrentCalls tests thread safety with 100+ parallel GetActualCost calls.
+// This validates concurrent RPC handling per coding guidelines requirement.
+func TestGetActualCost_ConcurrentCalls(t *testing.T) {
+	plugin := newTestPluginForActual()
 
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
+	const numGoroutines = 20
+	const callsPerGoroutine = 5
+	totalCalls := numGoroutines * callsPerGoroutine
+
+	errors := make(chan error, totalCalls)
+	done := make(chan bool, totalCalls)
+
+	from := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+
+	// Launch concurrent goroutines making GetActualCost calls
+	for i := 0; i < numGoroutines; i++ {
+		go func(id int) {
+			for j := 0; j < callsPerGoroutine; j++ {
+				var req *pbc.GetActualCostRequest
+
+				// Alternate between EC2 and EBS requests
+				if (id+j)%2 == 0 {
+					req = &pbc.GetActualCostRequest{
+						ResourceId: makeResourceJSON("aws", "ec2", "t3.micro", "us-east-1", nil),
+						Start:      timestamppb.New(from),
+						End:        timestamppb.New(to),
+					}
+				} else {
+					req = &pbc.GetActualCostRequest{
+						ResourceId: makeResourceJSON("aws", "ebs", "gp3", "us-east-1", map[string]string{"size": "100"}),
+						Start:      timestamppb.New(from),
+						End:        timestamppb.New(to),
+					}
+				}
+
+				_, err := plugin.GetActualCost(context.Background(), req)
+				if err != nil {
+					errors <- err
+				}
+				done <- true
+			}
+		}(i)
+	}
+
+	// Wait for all calls to complete
+	errorCount := 0
+	for i := 0; i < totalCalls; i++ {
+		<-done
+	}
+
+	// Check if any errors occurred
+	close(errors)
+	for err := range errors {
+		if err != nil {
+			errorCount++
+			t.Errorf("Concurrent GetActualCost call failed: %v", err)
 		}
 	}
-	return false
+
+	if errorCount > 0 {
+		t.Errorf("Failed %d out of %d concurrent GetActualCost calls", errorCount, totalCalls)
+	}
+
+	t.Logf("Successfully completed %d concurrent GetActualCost calls across %d goroutines", totalCalls, numGoroutines)
+}
+
+// containsString checks if substr is in s using the standard library.
+func containsString(s, substr string) bool {
+	return strings.Contains(s, substr)
 }

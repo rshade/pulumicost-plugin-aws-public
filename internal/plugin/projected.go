@@ -23,8 +23,8 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 	traceID := p.getTraceID(ctx)
 
 	if req == nil || req.Resource == nil {
-		err := status.Error(codes.InvalidArgument, "missing resource descriptor")
-		p.logError(ctx, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		err := p.newErrorWithID(traceID, codes.InvalidArgument, "missing resource descriptor", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		p.logErrorWithID(traceID, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 		return nil, err
 	}
 
@@ -32,15 +32,16 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 
 	// FR-029: Validate required fields
 	if resource.Provider == "" || resource.ResourceType == "" || resource.Sku == "" || resource.Region == "" {
-		err := status.Error(codes.InvalidArgument, "resource descriptor missing required fields (provider, resource_type, sku, region)")
-		p.logError(ctx, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		err := p.newErrorWithID(traceID, codes.InvalidArgument, "resource descriptor missing required fields (provider, resource_type, sku, region)", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		p.logErrorWithID(traceID, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 		return nil, err
 	}
 
 	// FR-027 & FR-028: Check region match
 	if resource.Region != p.region {
-		// Create error details map
+		// Create error details map with trace_id
 		details := map[string]string{
+			"trace_id":       traceID,
 			"pluginRegion":   p.region,
 			"requiredRegion": resource.Region,
 		}
@@ -55,7 +56,7 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 		// Return error with details
 		st := status.New(codes.FailedPrecondition, errDetail.Message)
 		st, _ = st.WithDetails(errDetail)
-		p.logError(ctx, "GetProjectedCost", st.Err(), pbc.ErrorCode_ERROR_CODE_UNSUPPORTED_REGION)
+		p.logErrorWithID(traceID, "GetProjectedCost", st.Err(), pbc.ErrorCode_ERROR_CODE_UNSUPPORTED_REGION)
 		return nil, st.Err()
 	}
 
@@ -65,11 +66,11 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 
 	switch resource.ResourceType {
 	case "ec2":
-		resp, err = p.estimateEC2(ctx, resource)
+		resp, err = p.estimateEC2(traceID, resource)
 	case "ebs":
-		resp, err = p.estimateEBS(ctx, resource)
+		resp, err = p.estimateEBS(traceID, resource)
 	case "s3", "lambda", "rds", "dynamodb":
-		resp, err = p.estimateStub(ctx, resource)
+		resp, err = p.estimateStub(resource)
 	default:
 		// Unknown resource type - return $0 with explanation
 		resp = &pbc.GetProjectedCostResponse{
@@ -81,7 +82,7 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 	}
 
 	if err != nil {
-		p.logError(ctx, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_UNSPECIFIED)
+		p.logErrorWithID(traceID, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_UNSPECIFIED)
 		return nil, err
 	}
 
@@ -100,9 +101,9 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 }
 
 // estimateEC2 calculates the projected monthly cost for an EC2 instance.
-func (p *AWSPublicPlugin) estimateEC2(ctx context.Context, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
+// traceID is passed from the parent handler to ensure consistent trace correlation.
+func (p *AWSPublicPlugin) estimateEC2(traceID string, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
 	instanceType := resource.Sku
-	traceID := p.getTraceID(ctx)
 
 	// Hardcoded assumptions for v1
 	os := "Linux"
@@ -147,9 +148,9 @@ func (p *AWSPublicPlugin) estimateEC2(ctx context.Context, resource *pbc.Resourc
 }
 
 // estimateEBS calculates the projected monthly cost for an EBS volume.
-func (p *AWSPublicPlugin) estimateEBS(ctx context.Context, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
+// traceID is passed from the parent handler to ensure consistent trace correlation.
+func (p *AWSPublicPlugin) estimateEBS(traceID string, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
 	volumeType := resource.Sku
-	traceID := p.getTraceID(ctx)
 
 	// FR-041 & FR-042: Extract size from tags, default to 8GB
 	sizeGB := defaultEBSGB
@@ -216,7 +217,7 @@ func (p *AWSPublicPlugin) estimateEBS(ctx context.Context, resource *pbc.Resourc
 }
 
 // estimateStub returns $0 cost for services not yet implemented.
-func (p *AWSPublicPlugin) estimateStub(ctx context.Context, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
+func (p *AWSPublicPlugin) estimateStub(resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
 	// FR-025 & FR-026: Return $0 with explanation
 	return &pbc.GetProjectedCostResponse{
 		CostPerMonth:  0,

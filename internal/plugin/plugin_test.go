@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/rshade/pulumicost-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/pulumicost-spec/sdk/go/proto/pulumicost/v1"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // mockPricingClient is a test double for pricing.PricingClient.
@@ -191,14 +193,15 @@ func TestTraceIDGenerationWhenMissing(t *testing.T) {
 	}
 }
 
-// T019: Test concurrent requests maintain separate trace_ids
+// T019: Test concurrent requests maintain separate trace_ids.
+// Per coding guidelines, this test uses 100+ goroutines to validate concurrent RPC handling.
 func TestConcurrentRequestsWithDifferentTraceIDs(t *testing.T) {
 	mock := newMockPricingClient("us-east-1", "USD")
 	mock.ec2Prices["t3.micro/Linux/Shared"] = 0.0104
 	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
 	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
 
-	const numGoroutines = 10
+	const numGoroutines = 100
 	var wg sync.WaitGroup
 	results := make(chan string, numGoroutines)
 
@@ -207,8 +210,8 @@ func TestConcurrentRequestsWithDifferentTraceIDs(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 
-			// Each goroutine has its own trace_id
-			traceID := "trace-" + string(rune('A'+id))
+			// Each goroutine has its own trace_id using numeric format for 100+ support
+			traceID := fmt.Sprintf("trace-%03d", id)
 			md := metadata.New(map[string]string{
 				pluginsdk.TraceIDMetadataKey: traceID,
 			})
@@ -276,6 +279,72 @@ func TestErrorLogsContainErrorCode(t *testing.T) {
 	operation, ok := logEntry["operation"].(string)
 	if !ok || operation != "GetProjectedCost" {
 		t.Errorf("operation = %q, want %q", operation, "GetProjectedCost")
+	}
+}
+
+// TestErrorResponseContainsTraceID verifies that gRPC error responses include trace_id in details.
+//
+// This test validates that when an error occurs, the error response includes the trace_id
+// in the ErrorDetail.Details map. This allows clients to correlate error responses with
+// server-side log entries for debugging and troubleshooting.
+//
+// Test workflow:
+//  1. Create plugin with mock pricing client
+//  2. Send request with trace_id in gRPC metadata that will trigger an error
+//  3. Extract ErrorDetail from gRPC status
+//  4. Verify trace_id appears in Details map
+func TestErrorResponseContainsTraceID(t *testing.T) {
+	var logBuf bytes.Buffer
+	mock := newMockPricingClient("us-east-1", "USD")
+	logger := zerolog.New(&logBuf).Level(zerolog.ErrorLevel)
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	expectedTraceID := "test-error-trace-12345"
+
+	// Create context with trace_id in gRPC metadata
+	md := metadata.New(map[string]string{
+		pluginsdk.TraceIDMetadataKey: expectedTraceID,
+	})
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+
+	// Request with region mismatch to trigger error with details
+	req := &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{
+			Provider:     "aws",
+			ResourceType: "ec2",
+			Sku:          "t3.micro",
+			Region:       "eu-west-1", // Wrong region
+		},
+	}
+
+	_, err := plugin.GetProjectedCost(ctx, req)
+	if err == nil {
+		t.Fatal("Expected error for region mismatch")
+	}
+
+	// Extract gRPC status from error
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatal("Expected gRPC status error")
+	}
+
+	// Check for ErrorDetail in status details
+	var foundTraceID bool
+	for _, detail := range st.Details() {
+		if errDetail, ok := detail.(*pbc.ErrorDetail); ok {
+			if traceID, exists := errDetail.Details["trace_id"]; exists {
+				if traceID == expectedTraceID {
+					foundTraceID = true
+					t.Logf("Found trace_id in error details: %s", traceID)
+				} else {
+					t.Errorf("trace_id = %q, want %q", traceID, expectedTraceID)
+				}
+			}
+		}
+	}
+
+	if !foundTraceID {
+		t.Error("trace_id should be present in error response details")
 	}
 }
 
