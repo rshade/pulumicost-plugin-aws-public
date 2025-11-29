@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,7 +21,7 @@ import (
 type AWSPublicPlugin struct {
 	region  string
 	pricing pricing.PricingClient
-	logger  zerolog.Logger
+	logger  zerolog.Logger // logger is immutable (copy-on-write)
 }
 
 // NewAWSPublicPlugin creates a new AWSPublicPlugin instance.
@@ -37,6 +38,13 @@ func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logg
 // getTraceID extracts the trace_id from context or generates a UUID if not present.
 // This implements the workaround for missing interceptor support in ServeConfig.
 // See research.md U1 Remediation for details.
+//
+// Extraction order:
+//   1. SDK helper (if interceptor registered)
+//   2. Direct gRPC metadata lookup
+//   3. UUID generation (FR-003 fallback)
+//
+// Returns a non-empty trace_id string suitable for log correlation.
 func (p *AWSPublicPlugin) getTraceID(ctx context.Context) string {
 	// First try SDK helper (works if interceptor was somehow registered)
 	traceID := pluginsdk.TraceIDFromContext(ctx)
@@ -53,6 +61,26 @@ func (p *AWSPublicPlugin) getTraceID(ctx context.Context) string {
 
 	// Generate UUID if not present (per FR-003)
 	return uuid.New().String()
+}
+
+const maxTagsToLog = 5
+
+func sanitizeTagsForLogging(tags map[string]string) map[string]string {
+	sanitized := make(map[string]string)
+	for k, v := range tags {
+		kLower := strings.ToLower(k)
+		// Skip known sensitive keys
+		if strings.Contains(kLower, "secret") ||
+			strings.Contains(kLower, "password") ||
+			strings.Contains(kLower, "token") {
+			continue
+		}
+		sanitized[k] = v
+		if len(sanitized) >= maxTagsToLog {
+			break
+		}
+	}
+	return sanitized
 }
 
 // logErrorWithID logs an error using a pre-captured trace ID.
@@ -160,8 +188,9 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 	// Get projected monthly cost using helper
 	projectedResp, err := p.getProjectedForResource(traceID, resource)
 	if err != nil {
-		// Note: Use UNSPECIFIED as the error could be various types from projected cost calculation
-		p.logErrorWithID(traceID, "GetActualCost", err, pbc.ErrorCode_ERROR_CODE_UNSPECIFIED)
+		// Extract error code from gRPC status to preserve context
+		errCode := extractErrorCode(err)
+		p.logErrorWithID(traceID, "GetActualCost", err, errCode)
 		return nil, err
 	}
 
@@ -174,6 +203,7 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 		Str(pluginsdk.FieldResourceType, resource.ResourceType).
 		Str("aws_service", resource.ResourceType).
 		Str("aws_region", resource.Region).
+		Interface("tags", sanitizeTagsForLogging(resource.Tags)).
 		Float64("cost_monthly", actualCost).
 		Float64("usage_amount", runtimeHours).
 		Str("usage_unit", "hours").
@@ -189,6 +219,19 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 			Source:      formatActualBillingDetail(projectedResp.BillingDetail, runtimeHours, actualCost),
 		}},
 	}, nil
+}
+
+// extractErrorCode retrieves the pbc.ErrorCode from a gRPC error status.
+// It inspects ErrorDetail in the status details.
+func extractErrorCode(err error) pbc.ErrorCode {
+	if st, ok := status.FromError(err); ok {
+		for _, detail := range st.Details() {
+			if errDetail, ok := detail.(*pbc.ErrorDetail); ok {
+				return errDetail.Code
+			}
+		}
+	}
+	return pbc.ErrorCode_ERROR_CODE_UNSPECIFIED
 }
 
 // parseResourceFromRequest extracts a ResourceDescriptor from the request.

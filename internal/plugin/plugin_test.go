@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -141,13 +142,23 @@ func TestTraceIDPropagationWithProvidedTraceID(t *testing.T) {
 	}
 
 	// Verify structured field in JSON
-	var logEntry map[string]interface{}
-	if err := json.Unmarshal(logBuf.Bytes(), &logEntry); err == nil {
+	scanner := bufio.NewScanner(&logBuf)
+	found := false
+	for scanner.Scan() {
+		var logEntry map[string]interface{}
+		if err := json.Unmarshal(scanner.Bytes(), &logEntry); err != nil {
+			continue
+		}
 		if traceID, ok := logEntry["trace_id"].(string); ok {
-			if traceID != expectedTraceID {
-				t.Errorf("trace_id = %q, want %q", traceID, expectedTraceID)
+			if traceID == expectedTraceID {
+				found = true
+				break
 			}
 		}
+	}
+
+	if !found {
+		t.Errorf("trace_id %q not found in any log entry", expectedTraceID)
 	}
 }
 

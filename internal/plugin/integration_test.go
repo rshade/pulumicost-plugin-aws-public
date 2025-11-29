@@ -23,6 +23,8 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+const portAnnouncementTimeout = 5 * time.Second
+
 // TestIntegration_APSoutheast1_Binary performs end-to-end testing of the ap-southeast-1 binary.
 //
 // This integration test validates the complete gRPC plugin lifecycle including:
@@ -76,7 +78,7 @@ func TestIntegration_APSoutheast1_Binary(t *testing.T) {
 	scanner := bufio.NewScanner(stdout)
 	portRegex := regexp.MustCompile(`^PORT=(\d+)$`)
 
-	timeout := time.After(5 * time.Second)
+	timeout := time.After(portAnnouncementTimeout)
 	portChan := make(chan int, 1)
 
 	go func() {
@@ -276,7 +278,7 @@ func TestIntegration_TraceIDPropagation(t *testing.T) {
 	scanner := bufio.NewScanner(stdout)
 	portRegex := regexp.MustCompile(`^PORT=(\d+)$`)
 
-	timeout := time.After(5 * time.Second)
+	timeout := time.After(portAnnouncementTimeout)
 	portChan := make(chan int, 1)
 
 	go func() {

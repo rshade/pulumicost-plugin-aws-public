@@ -530,3 +530,30 @@ func TestGetActualCost_ConcurrentCalls(t *testing.T) {
 func containsString(s, substr string) bool {
 	return strings.Contains(s, substr)
 }
+
+// TestGetActualCostWithInvalidResourceJSON tests behavior when ResourceId is invalid JSON and Tags are missing.
+func TestGetActualCostWithInvalidResourceJSON(t *testing.T) {
+	plugin := newTestPluginForActual()
+	ctx := context.Background()
+
+	from := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := from.Add(1 * time.Hour)
+
+	req := &pbc.GetActualCostRequest{
+		ResourceId: "{invalid-json-garbage", // Malformed JSON
+		Tags:       nil,                      // No tags to fallback to
+		Start:      timestamppb.New(from),
+		End:        timestamppb.New(to),
+	}
+
+	_, err := plugin.GetActualCost(ctx, req)
+	if err == nil {
+		t.Error("Expected error for invalid JSON ResourceId with no Tags, got nil")
+	} else {
+		// Should fail in parseResourceFromRequest
+		if !strings.Contains(err.Error(), "missing resource information") {
+			t.Errorf("Expected 'missing resource information' error, got: %v", err)
+		}
+	}
+}
+

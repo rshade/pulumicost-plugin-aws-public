@@ -93,6 +93,7 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 		Str(pluginsdk.FieldResourceType, resource.ResourceType).
 		Str("aws_service", resource.ResourceType).
 		Str("aws_region", resource.Region).
+		Interface("tags", sanitizeTagsForLogging(resource.Tags)).
 		Float64(pluginsdk.FieldCostMonthly, resp.CostPerMonth).
 		Int64(pluginsdk.FieldDurationMs, time.Since(start).Milliseconds()).
 		Msg("cost calculated")
@@ -117,6 +118,8 @@ func (p *AWSPublicPlugin) estimateEC2(traceID string, resource *pbc.ResourceDesc
 			Str(pluginsdk.FieldTraceID, traceID).
 			Str(pluginsdk.FieldOperation, "GetProjectedCost").
 			Str("instance_type", instanceType).
+			Str("aws_region", p.region).
+			Str("pricing_source", "embedded").
 			Msg("EC2 instance type not found in pricing data")
 
 		return &pbc.GetProjectedCostResponse{
@@ -132,6 +135,8 @@ func (p *AWSPublicPlugin) estimateEC2(traceID string, resource *pbc.ResourceDesc
 		Str(pluginsdk.FieldTraceID, traceID).
 		Str(pluginsdk.FieldOperation, "GetProjectedCost").
 		Str("instance_type", instanceType).
+		Str("aws_region", p.region).
+		Str("pricing_source", "embedded").
 		Float64("unit_price", hourlyRate).
 		Msg("EC2 pricing lookup successful")
 
@@ -178,6 +183,8 @@ func (p *AWSPublicPlugin) estimateEBS(traceID string, resource *pbc.ResourceDesc
 			Str(pluginsdk.FieldTraceID, traceID).
 			Str(pluginsdk.FieldOperation, "GetProjectedCost").
 			Str("storage_type", volumeType).
+			Str("aws_region", p.region).
+			Str("pricing_source", "embedded").
 			Msg("EBS volume type not found in pricing data")
 
 		return &pbc.GetProjectedCostResponse{
@@ -193,6 +200,8 @@ func (p *AWSPublicPlugin) estimateEBS(traceID string, resource *pbc.ResourceDesc
 		Str(pluginsdk.FieldTraceID, traceID).
 		Str(pluginsdk.FieldOperation, "GetProjectedCost").
 		Str("storage_type", volumeType).
+		Str("aws_region", p.region).
+		Str("pricing_source", "embedded").
 		Float64("unit_price", ratePerGBMonth).
 		Msg("EBS pricing lookup successful")
 
