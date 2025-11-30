@@ -18,16 +18,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
 
       - name: Generate pricing data
-        run: go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1,ap-southeast-1,ap-southeast-2,ap-northeast-1,ap-south-1,ca-central-1,sa-east-1 --out-dir ./internal/pricing/data --dummy
+        run: go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1,ap-southeast-1,ap-southeast-2,ap-northeast-1,ap-south-1,ca-central-1,sa-east-1 --out-dir ./internal/pricing/data
 
       - name: Run tests
         run: make test
@@ -46,32 +46,52 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version: '1.25'
-          cache: true
+          cache: false # Disable cache - we clean between regions to save disk
 
-      - name: Generate pricing data
-        run: go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1,ap-southeast-1,ap-southeast-2,ap-northeast-1,ap-south-1,ca-central-1,sa-east-1 --out-dir ./internal/pricing/data --dummy
-
-      - name: Build binaries with GoReleaser
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           version: '~> v2'
-          args: build --snapshot --clean
+          install-only: true
 
-      - name: Verify binaries exist
+      - name: Build all regions sequentially
         run: |
-          ls -la dist/
-          echo "Verifying all 9 region binaries..."
-          for region in us-east-1 us-west-2 eu-west-1 ap-southeast-1 ap-southeast-2 ap-northeast-1 ap-south-1 ca-central-1 sa-east-1; do
-            if ! find dist/ -name "*${region}*" -type f | grep -q .; then
+          # Build one region at a time: generate pricing → build → verify → clean
+          # This keeps disk usage constant (~200MB) regardless of region count
+          # Each region is verified immediately after build, before next clean
+          REGIONS="us-east-1 us-west-2 eu-west-1 ap-southeast-1 ap-southeast-2 ap-northeast-1 ap-south-1 ca-central-1 sa-east-1"
+          SUCCESS_COUNT=0
+
+          for region in $REGIONS; do
+            echo ""
+            echo "=============================================="
+            echo "Building region: $region"
+            echo "=============================================="
+            df -h / | tail -1
+
+            bash ./scripts/build-region.sh "$region" --snapshot
+
+            # Verify binary exists immediately (before next build cleans dist/)
+            if find dist/ -name "*${region}*" -type f | grep -q .; then
+              echo "✓ Verified binary for ${region}"
+              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+            else
               echo "ERROR: Missing binary for region ${region}"
+              ls -la dist/
               exit 1
             fi
-            echo "✓ Found binary for ${region}"
+
+            echo "Disk after $region:"
+            df -h / | tail -1
           done
-          echo "All 9 region binaries verified!"
+
+          echo ""
+          echo "=============================================="
+          echo "All ${SUCCESS_COUNT}/9 region binaries built and verified!"
+          echo "=============================================="
