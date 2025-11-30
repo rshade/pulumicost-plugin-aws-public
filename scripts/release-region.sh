@@ -101,13 +101,18 @@ release:
   disable: true
 EOF
 
-goreleaser release --config .goreleaser.region.yaml --skip=validate,announce,publish
+goreleaser release --config .goreleaser.region.yaml --dist "_build/$REGION" --skip=validate,announce,publish --clean
+
+# Move artifacts to main dist folder
+mkdir -p dist
+mv _build/"$REGION"/*.{tar.gz,zip} dist/
+rm -rf _build
 
 # Step 3: Clean up to free disk space for next region
 echo "Cleaning up build cache..."
 rm -f .goreleaser.region.yaml
 # Remove the raw binaries but keep archives
-rm -rf dist/${REGION}_*
+
 go clean -cache
 
 echo "=== Completed: $REGION ==="

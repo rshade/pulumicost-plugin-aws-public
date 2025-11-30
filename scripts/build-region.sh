@@ -75,7 +75,8 @@ builds:
       - -s -w -X main.version={{.Version}}
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -86,7 +87,7 @@ archives:
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ 'zip' ]
 
 checksum:
   disable: true
@@ -101,7 +102,7 @@ source:
   enabled: false
 EOF
 
-goreleaser build --config .goreleaser.region.yaml $SNAPSHOT_FLAG
+goreleaser build --config .goreleaser.region.yaml --clean $SNAPSHOT_FLAG
 
 # Step 3: Clean up to free disk space for next region
 echo "Cleaning up build cache..."
