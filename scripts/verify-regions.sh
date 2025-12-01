@@ -133,7 +133,7 @@ if ! $QUIET; then
 fi
 
 # Check each region has a build block in GoReleaser config
-for region in $regions; do
+for region in "${region_array[@]}"; do
     if ! grep -q "id: $region" "$GORELEASER_CONFIG"; then
         echo "ERROR: Build block missing for region $region in GoReleaser config" >&2
         exit 1

@@ -48,18 +48,18 @@ jobs:
           make generate-embeds
           make generate-goreleaser
 
-       # 5. Verify regions
-       - name: Verify regions
-         run: make verify-regions
+      # 5. Verify regions
+      - name: Verify regions
+        run: make verify-regions
 
-       # 6. Build all regions sequentially (one at a time to save disk)
-       - name: Build all regions
-         run: |
-           # Build one region at a time: generate pricing → build → clean cache
-           # This keeps disk usage constant (~200MB) regardless of region count
-           REGIONS=$(sed -n 's/^ *name: //p' internal/pricing/regions.yaml | tr '\n' ' ' | xargs)
+      # 6. Build all regions sequentially (one at a time to save disk)
+      - name: Build all regions
+        run: |
+          # Build one region at a time: generate pricing → build → clean cache
+          # This keeps disk usage constant (~200MB) regardless of region count
+          REGIONS=$(sed -n 's/^ *name: //p' internal/pricing/regions.yaml | tr '\n' ' ' | xargs)
 
-           for region in $REGIONS; do
+          for region in $REGIONS; do
             echo ""
             echo "=============================================="
             echo "Building region: $region"
@@ -72,12 +72,12 @@ jobs:
             df -h / | tail -1
           done
 
-       # 7. Generate checksums for all archives
-       - name: Generate checksums
-         run: |
-           cd dist
-           sha256sum *.tar.gz *.zip > checksums.txt
-           cat checksums.txt
+      # 7. Generate checksums for all archives
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum ./*.tar.gz ./*.zip > checksums.txt
+          cat checksums.txt
 
       # 8. Upload release assets
       - name: Upload release assets

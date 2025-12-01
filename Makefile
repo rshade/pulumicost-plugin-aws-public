@@ -4,6 +4,9 @@ REGIONS := $(shell awk '/name:/ {gsub(/.*name: /, ""); print}' $(REGIONS_FILE))
 REGIONS_CSV := $(shell awk '/name:/ {gsub(/.*name: /, ""); print}' $(REGIONS_FILE) | tr '\n' ',' | sed 's/,$$//')
 REGION_COUNT := $(words $(REGIONS))
 
+.PHONY: all
+all: build ## Default target - build the plugin
+
 .PHONY: help
 help: ## Show this help message
 	@echo "Available targets:"

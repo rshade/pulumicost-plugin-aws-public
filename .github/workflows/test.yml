@@ -77,7 +77,8 @@ jobs:
           # Build one region at a time: use generated configs → build → verify → clean
           # This keeps disk usage constant (~200MB) regardless of region count
           # Each region is verified immediately after build, before next clean
-          REGIONS="us-east-1 us-west-2 eu-west-1 ap-southeast-1 ap-southeast-2 ap-northeast-1 ap-south-1 ca-central-1 sa-east-1"
+          REGIONS=$(sed -n 's/^ *name: //p' internal/pricing/regions.yaml | tr '\n' ' ' | xargs)
+          REGION_COUNT=$(echo "$REGIONS" | wc -w)
           SUCCESS_COUNT=0
 
           for region in $REGIONS; do
@@ -105,5 +106,5 @@ jobs:
 
           echo ""
           echo "=============================================="
-          echo "All ${SUCCESS_COUNT}/9 region binaries built and verified!"
+          echo "All ${SUCCESS_COUNT}/${REGION_COUNT} region binaries built and verified!"
           echo "=============================================="
