@@ -86,6 +86,13 @@ source:
   enabled: false
 `
 
+// main parses command-line flags, reads and validates a regions YAML file,
+// generates a GoReleaser configuration from the regions, and writes it to disk.
+//
+// It accepts flags `-config` (path to regions YAML, default "regions.yaml")
+// and `-output` (output file path, default ".goreleaser.yaml"). The program
+// exits with status 1 on errors loading the config, validating regions, or
+// generating the output file, and prints a confirmation message on success.
 func main() {
 	configPath := flag.String("config", "regions.yaml", "Path to regions config")
 	outputPath := flag.String("output", ".goreleaser.yaml", "Output file path")
@@ -113,6 +120,8 @@ func main() {
 	fmt.Printf("Generated GoReleaser config at %s with %d regions\n", *outputPath, len(regions))
 }
 
+// loadRegionsConfig reads a YAML file at filename and returns the parsed slice of RegionConfig entries.
+// It returns an error if the file cannot be read or if the YAML cannot be unmarshaled into RegionsConfig.
 func loadRegionsConfig(filename string) ([]RegionConfig, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -127,6 +136,9 @@ func loadRegionsConfig(filename string) ([]RegionConfig, error) {
 	return config.Regions, nil
 }
 
+// validateRegions verifies that each RegionConfig has a non-empty ID, Name, and Tag,
+// that the Tag equals "region_"+ID, and that no two regions share the same ID.
+// It returns an error describing the first validation failure, or nil if all regions are valid.
 func validateRegions(regions []RegionConfig) error {
 	seen := make(map[string]bool)
 	for _, r := range regions {
@@ -151,6 +163,15 @@ func validateRegions(regions []RegionConfig) error {
 	return nil
 }
 
+// generateGoReleaserConfig generates a GoReleaser configuration file at outputPath using the provided regions.
+// It fills a TemplateData with the regions, parses the package's goreleaserTemplate, and writes the rendered result
+// to the specified output file.
+//
+// regions is the list of RegionConfig entries to include in the generated configuration.
+// outputPath is the filesystem path where the rendered configuration will be created (truncated if existing).
+//
+// It returns an error if template parsing fails, the output file cannot be created, template execution fails,
+// or if closing the output file produces an error.
 func generateGoReleaserConfig(regions []RegionConfig, outputPath string) error {
 	data := TemplateData{
 		Regions: regions,
