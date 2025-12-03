@@ -363,6 +363,43 @@ Returned when ResourceDescriptor is missing required fields.
 
 **gRPC Code:** `InvalidArgument`
 
+## E2E Test Support
+
+The plugin includes support for E2E testing with expected cost ranges and test
+mode features.
+
+### Enabling Test Mode
+
+Set the environment variable before starting the plugin:
+
+```bash
+export PULUMICOST_TEST_MODE=true
+./pulumicost-plugin-aws-public-us-east-1
+```
+
+**Valid Values:**
+
+- `true` - Enable test mode (enhanced logging, validation support)
+- `false` or unset - Production mode (standard behavior)
+- Other values - Treated as disabled with warning logged
+
+### Expected Cost Ranges
+
+Reference values for E2E test validation (as of 2025-12-01):
+
+| Resource | SKU | Region | Monthly Cost | Tolerance |
+|----------|-----|--------|--------------|-----------|
+| EC2 | t3.micro | us-east-1 | $7.592 | ±1% |
+| EBS | gp2 (8GB) | us-east-1 | $0.80 | ±5% |
+
+### Enhanced Logging
+
+When test mode is enabled, additional debug logs include calculation details:
+
+```bash
+LOG_LEVEL=debug PULUMICOST_TEST_MODE=true ./pulumicost-plugin-aws-public-us-east-1
+```
+
 ## Development
 
 ### Prerequisites

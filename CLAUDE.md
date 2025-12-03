@@ -19,7 +19,7 @@ Go 1.25+: Follow standard conventions
 - On startup: plugin writes `PORT=<port>` to stdout, then serves gRPC on 127.0.0.1
 - Core connects via gRPC and calls methods like `GetProjectedCost()`, `Supports()`, `Name()`
 - **One resource per RPC call** (not batch processing)
-- Uses **pluginsdk.Serve()** from `pulumicost-core/pkg/pluginsdk` for lifecycle management
+- Uses **pluginsdk.Serve()** from `pulumicost-spec/sdk/go/pluginsdk` for lifecycle management
 - Graceful shutdown on context cancellation
 
 ### Required gRPC Methods
@@ -291,7 +291,7 @@ logOutput := stderrBuf.String()
 ## Development Notes
 
 ### Implementing the Plugin Interface
-From `pulumicost-core/pkg/pluginsdk`:
+From `pulumicost-spec/sdk/go/pluginsdk`:
 ```go
 type Plugin interface {
     Name() string
@@ -315,7 +315,7 @@ In `cmd/pulumicost-plugin-aws-public/main.go`:
 ```go
 import (
     "context"
-    "github.com/rshade/pulumicost-core/pkg/pluginsdk"
+    "github.com/rshade/pulumicost-spec/sdk/go/pluginsdk"
     "github.com/rshade/pulumicost-plugin-aws-public/internal/plugin"
 )
 
@@ -440,59 +440,21 @@ This allows the user to review and make the commit themselves, and ensures
 the commit message follows conventional commits format.
 
 ## Active Technologies
-- Go 1.25+ + pulumicost-core/pkg/pluginsdk, pulumicost-spec/sdk/go/proto (003-ca-sa-region-support)
-- Embedded JSON files (go:embed) - no external storage (003-ca-sa-region-support)
-- N/A (embedded JSON pricing data via go:embed) (004-actual-cost-fallback)
-- N/A (logs to stderr only) (005-zerolog-logging)
 
-- Go 1.25+ (001-pulumicost-aws-plugin, 002-ap-region-support)
-- Embedded JSON files (go:embed) - No external storage required
-- Embedded JSON pricing files (go:embed) - no external storage
+- **Go 1.25+** with gRPC via pulumicost-spec/sdk/go/pluginsdk
+- **pulumicost-spec** protos for CostSourceService API
+- **zerolog** for structured JSON logging (stderr only)
+- **Embedded JSON** pricing data via `//go:embed` (no external storage)
 
 ## Recent Changes
-- 001-pulumicost-aws-plugin: Added Go 1.25+
-- 002-ap-region-support: Added 4 Asia Pacific regions (Singapore, Sydney, Tokyo, Mumbai)
-  - Created region-specific embed files (embed_apse1.go, embed_apse2.go, embed_apne1.go, embed_aps1.go)
-  - Updated GoReleaser config with 4 new build targets
-  - Extended test suites with AP region test cases
-  - Added success criteria validation tests (concurrent calls, latency, cross-region pricing, region rejection)
-  - All binaries are 16MB (< 20MB requirement)
-  - Region mismatch latency: 0.01ms (< 100ms requirement)
-  - 100% region rejection rate validated
-- 003-ca-sa-region-support: Added 2 Americas regions (Canada, South America)
-  - Created region-specific embed files (embed_cac1.go, embed_sae1.go)
-  - Build tags: region_cac1 (ca-central-1), region_sae1 (sa-east-1)
-  - Updated GoReleaser config with 2 new build targets (total 9 regions)
-  - Extended test suites with CA/SA region test cases
-  - All binaries are 16MB (< 20MB requirement)
-  - Region mismatch latency: 0.02ms (< 100ms requirement)
-  - All tests pass including concurrent RPC handling
-- 004-actual-cost-fallback: Implemented fallback GetActualCost method
-  - Formula: `actual_cost = projected_monthly_cost × (runtime_hours / 730)`
-  - Created internal/plugin/actual.go with helper functions
-  - Created internal/plugin/actual_test.go with comprehensive test suite
-  - Adapted to actual proto API (ResourceId JSON, Start/End, Results array)
-  - Supports EC2 and EBS with full calculation
-  - Supports stub services (S3, Lambda, RDS, DynamoDB) returning $0
-  - Error handling for nil timestamps, invalid time ranges
-  - Zero duration returns $0 with explanation
-  - Benchmark: 3.3μs/op (well under 10ms SC-003 requirement)
-  - All tests pass with 100% coverage of new actual cost logic
-- 005-zerolog-logging: Implemented zerolog structured logging with trace propagation
-  - Uses SDK utilities: NewPluginLogger, TraceIDFromContext from pulumicost-spec
-  - Logger field added to AWSPublicPlugin struct, passed from main.go
-  - getTraceID helper extracts trace_id from gRPC metadata or generates UUID fallback
-  - logError helper for consistent error logging with error_code field
-  - All handlers (GetProjectedCost, Supports, GetActualCost) log with SDK field constants
-  - LOG_LEVEL env var controls log verbosity (trace, debug, info, warn, error)
-  - Debug logs include instance_type for EC2, storage_type for EBS
-  - Startup log includes plugin_name, plugin_version, aws_region
-  - All logs output JSON to stderr (stdout reserved for PORT)
-  - Benchmark: ~6-13μs logging overhead (well under 1ms SC-005 requirement)
-  - Unit tests: TestTraceIDPropagationWithProvidedTraceID, TestTraceIDGenerationWhenMissing,
-    TestConcurrentRequestsWithDifferentTraceIDs, TestErrorLogsContainErrorCode,
-    TestStartupLogFormat, TestGetProjectedCostLogsContainRequiredFields,
-    TestSupportsLogsContainRequiredFields, TestDebugLogsContainInstanceTypeForEC2,
-    TestDebugLogsContainStorageTypeForEBS
-  - Integration test: TestIntegration_TraceIDPropagation verifies end-to-end trace_id
-    propagation from gRPC client metadata through to JSON log output
+
+| Issue | Summary |
+|-------|---------|
+| 008 | E2E test mode, expected cost validation (t3.micro, gp2) |
+| 005 | zerolog logging, trace_id propagation, LOG_LEVEL |
+| 004 | GetActualCost fallback: `projected × (hours/730)` |
+| 003 | Added ca-central-1, sa-east-1 (9 regions total) |
+| 002 | Added 4 AP regions (Singapore, Sydney, Tokyo, Mumbai) |
+| 001 | Initial plugin: EC2/EBS, us-east-1/us-west-2/eu-west-1 |
+
+**Performance:** ~16MB binary, <0.1ms region mismatch, <15μs logging

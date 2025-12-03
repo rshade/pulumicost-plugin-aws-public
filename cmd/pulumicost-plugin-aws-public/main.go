@@ -27,6 +27,9 @@ func main() {
 	// Create logger using SDK utility (outputs JSON to stderr)
 	logger := pluginsdk.NewPluginLogger("aws-public", version, level, nil)
 
+	// Validate test mode env var at startup (logs warning for invalid values)
+	plugin.ValidateTestModeEnv(logger)
+
 	// Initialize pricing client
 	pricingClient, err := pricing.NewClient()
 	if err != nil {
