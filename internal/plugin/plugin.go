@@ -19,19 +19,28 @@ import (
 
 // AWSPublicPlugin implements the pluginsdk.Plugin interface for AWS public pricing.
 type AWSPublicPlugin struct {
-	region  string
-	pricing pricing.PricingClient
-	logger  zerolog.Logger // logger is immutable (copy-on-write)
+	region   string
+	pricing  pricing.PricingClient
+	logger   zerolog.Logger // logger is immutable (copy-on-write)
+	testMode bool           // true when PULUMICOST_TEST_MODE=true
 }
 
 // NewAWSPublicPlugin creates a new AWSPublicPlugin instance.
 // The region should match the region for which pricing data is embedded.
 // The logger should be created using pluginsdk.NewPluginLogger for consistency.
+// Test mode is determined from PULUMICOST_TEST_MODE environment variable at construction.
 func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logger zerolog.Logger) *AWSPublicPlugin {
+	testMode := IsTestMode()
+
+	if testMode {
+		logger.Info().Msg("Test mode enabled")
+	}
+
 	return &AWSPublicPlugin{
-		region:  region,
-		pricing: pricingClient,
-		logger:  logger,
+		region:   region,
+		pricing:  pricingClient,
+		logger:   logger,
+		testMode: testMode,
 	}
 }
 
@@ -165,6 +174,17 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 		return nil, err
 	}
 
+	// Test mode: Enhanced logging for request details (US3)
+	if p.testMode {
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str("resource_type", resource.ResourceType).
+			Str("sku", resource.Sku).
+			Str("region", resource.Region).
+			Float64("runtime_hours", runtimeHours).
+			Msg("Test mode: GetActualCost request details")
+	}
+
 	// Handle zero duration - return $0 with single result
 	if runtimeHours == 0 {
 		p.logger.Info().
@@ -196,6 +216,17 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 
 	// Apply formula: actual_cost = projected_monthly_cost × (runtime_hours / 730)
 	actualCost := projectedResp.CostPerMonth * (runtimeHours / hoursPerMonth)
+
+	// Test mode: Enhanced logging for calculation result (US3)
+	if p.testMode {
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Float64("projected_monthly", projectedResp.CostPerMonth).
+			Float64("runtime_hours", runtimeHours).
+			Float64("actual_cost", actualCost).
+			Str("formula", "projected_monthly × (runtime_hours / 730)").
+			Msg("Test mode: GetActualCost calculation result")
+	}
 
 	p.logger.Info().
 		Str(pluginsdk.FieldTraceID, traceID).

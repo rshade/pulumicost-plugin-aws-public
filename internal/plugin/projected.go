@@ -31,6 +31,17 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 
 	resource := req.Resource
 
+	// Test mode: Enhanced logging for request details (US3)
+	if p.testMode {
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str("resource_type", resource.ResourceType).
+			Str("sku", resource.Sku).
+			Str("region", resource.Region).
+			Str("provider", resource.Provider).
+			Msg("Test mode: request details")
+	}
+
 	// FR-029: Validate required fields
 	if resource.Provider == "" || resource.ResourceType == "" || resource.Sku == "" || resource.Region == "" {
 		err := p.newErrorWithID(traceID, codes.InvalidArgument, "resource descriptor missing required fields (provider, resource_type, sku, region)", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
@@ -85,6 +96,17 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 	if err != nil {
 		p.logErrorWithID(traceID, "GetProjectedCost", err, pbc.ErrorCode_ERROR_CODE_UNSPECIFIED)
 		return nil, err
+	}
+
+	// Test mode: Enhanced logging for calculation result (US3)
+	if p.testMode {
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Float64("unit_price", resp.UnitPrice).
+			Float64("cost_per_month", resp.CostPerMonth).
+			Str("currency", resp.Currency).
+			Str("billing_detail", resp.BillingDetail).
+			Msg("Test mode: calculation result")
 	}
 
 	// Log successful completion with all required fields
