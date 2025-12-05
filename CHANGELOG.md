@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.5](https://github.com/rshade/pulumicost-plugin-aws-public/compare/pulumicost-plugin-aws-public-v0.0.4...pulumicost-plugin-aws-public-v0.0.5) (2025-12-05)
+
+
+### Features
+
+* add support for additional US regions (us-west-1, us-gov-west-1, us-gov-east-1) ([#46](https://github.com/rshade/pulumicost-plugin-aws-public/issues/46)) ([ce71fd4](https://github.com/rshade/pulumicost-plugin-aws-public/commit/ce71fd45f35379ca9f8db86f12ace007f54950de)), closes [#4](https://github.com/rshade/pulumicost-plugin-aws-public/issues/4)
+* automate region build matrix ([#49](https://github.com/rshade/pulumicost-plugin-aws-public/issues/49)) ([8003dcf](https://github.com/rshade/pulumicost-plugin-aws-public/commit/8003dcff87680c42255c5a6ebb0092389a5b0ed5))
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/goccy/go-yaml to v1.19.0 ([#61](https://github.com/rshade/pulumicost-plugin-aws-public/issues/61)) ([e83e42b](https://github.com/rshade/pulumicost-plugin-aws-public/commit/e83e42b50bc0083a1adb55c887f48a104d666eb3))
+* **deps:** update module github.com/rshade/pulumicost-spec to v0.4.2 ([#47](https://github.com/rshade/pulumicost-plugin-aws-public/issues/47)) ([21dbb97](https://github.com/rshade/pulumicost-plugin-aws-public/commit/21dbb97f4ccc7a0ea23f535128cc97d87eaa74e2))
+* **deps:** update module github.com/rshade/pulumicost-spec to v0.4.3 ([#69](https://github.com/rshade/pulumicost-plugin-aws-public/issues/69)) ([b56c439](https://github.com/rshade/pulumicost-plugin-aws-public/commit/b56c439873dec68432d6ff621308e90663692d1d))
+
 ## [0.0.4](https://github.com/rshade/pulumicost-plugin-aws-public/compare/pulumicost-plugin-aws-public-v0.0.3...pulumicost-plugin-aws-public-v0.0.4) (2025-11-30)
 
 
