@@ -58,6 +58,8 @@ echo "Building binaries for $REGION..."
 cat > ".goreleaser.region.yaml" << EOF
 version: 2
 
+dist: _build/$REGION
+
 builds:
   - id: $REGION
     main: ./cmd/pulumicost-plugin-aws-public
@@ -106,7 +108,7 @@ release:
   disable: true
 EOF
 
-goreleaser release --config .goreleaser.region.yaml --dist "_build/$REGION" --skip=validate,announce,publish --clean
+goreleaser release --config .goreleaser.region.yaml --skip=validate,announce,publish --clean
 
 # Move artifacts to main dist folder
 mkdir -p dist
