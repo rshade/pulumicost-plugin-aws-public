@@ -56,6 +56,10 @@ func (m *mockPricingClientActual) RDSStoragePricePerGBMonth(volumeType string) (
 	return price, ok
 }
 
+func (m *mockPricingClientActual) EKSClusterPricePerHour() (float64, bool) {
+	return 0.10, true // Standard EKS rate
+}
+
 func newTestPluginForActual() *AWSPublicPlugin {
 	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
 	return NewAWSPublicPlugin("us-east-1", &mockPricingClientActual{
@@ -560,7 +564,7 @@ func TestGetActualCostWithInvalidResourceJSON(t *testing.T) {
 
 	req := &pbc.GetActualCostRequest{
 		ResourceId: "{invalid-json-garbage", // Malformed JSON
-		Tags:       nil,                      // No tags to fallback to
+		Tags:       nil,                     // No tags to fallback to
 		Start:      timestamppb.New(from),
 		End:        timestamppb.New(to),
 	}
@@ -575,4 +579,3 @@ func TestGetActualCostWithInvalidResourceJSON(t *testing.T) {
 		}
 	}
 }
-

@@ -66,7 +66,7 @@ func (p *AWSPublicPlugin) Supports(ctx context.Context, req *pbc.SupportsRequest
 
 	// Check resource type
 	switch resource.ResourceType {
-	case "ec2", "ebs", "rds":
+	case "ec2", "ebs", "rds", "eks":
 		// Fully supported
 		p.logger.Info().
 			Str(pluginsdk.FieldTraceID, traceID).

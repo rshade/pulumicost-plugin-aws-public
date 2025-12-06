@@ -49,9 +49,9 @@ func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logg
 // See research.md U1 Remediation for details.
 //
 // Extraction order:
-//   1. SDK helper (if interceptor registered)
-//   2. Direct gRPC metadata lookup
-//   3. UUID generation (FR-003 fallback)
+//  1. SDK helper (if interceptor registered)
+//  2. Direct gRPC metadata lookup
+//  3. UUID generation (FR-003 fallback)
 //
 // Returns a non-empty trace_id string suitable for log correlation.
 func (p *AWSPublicPlugin) getTraceID(ctx context.Context) string {
@@ -75,8 +75,20 @@ func (p *AWSPublicPlugin) getTraceID(ctx context.Context) string {
 const maxTagsToLog = 5
 
 func sanitizeTagsForLogging(tags map[string]string) map[string]string {
-	sanitized := make(map[string]string)
+	if tags == nil {
+		return nil
+	}
+	// Pre-allocate with bounded capacity
+	capacity := len(tags)
+	if capacity > maxTagsToLog {
+		capacity = maxTagsToLog
+	}
+	sanitized := make(map[string]string, capacity)
 	for k, v := range tags {
+		// Check limit first to avoid unnecessary processing
+		if len(sanitized) >= maxTagsToLog {
+			break
+		}
 		kLower := strings.ToLower(k)
 		// Skip known sensitive keys
 		if strings.Contains(kLower, "secret") ||
@@ -85,9 +97,6 @@ func sanitizeTagsForLogging(tags map[string]string) map[string]string {
 			continue
 		}
 		sanitized[k] = v
-		if len(sanitized) >= maxTagsToLog {
-			break
-		}
 	}
 	return sanitized
 }
@@ -117,8 +126,13 @@ func (p *AWSPublicPlugin) newErrorWithID(traceID string, grpcCode codes.Code, ms
 	}
 
 	st := status.New(grpcCode, msg)
-	st, _ = st.WithDetails(errDetail)
-	return st.Err()
+	stWithDetails, err := st.WithDetails(errDetail)
+	if err != nil {
+		// Log at debug level since this rarely fails
+		p.logger.Debug().Err(err).Msg("failed to attach error details to gRPC status")
+		return st.Err()
+	}
+	return stWithDetails.Err()
 }
 
 // Name returns the plugin name identifier.

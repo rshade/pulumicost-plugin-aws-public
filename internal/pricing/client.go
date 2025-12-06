@@ -3,11 +3,9 @@ package pricing
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 // PricingClient provides pricing data lookups
@@ -36,6 +34,10 @@ type PricingClient interface {
 	// volumeType: e.g., "gp2", "gp3", "io1"
 	// Returns (price, true) if found, (0, false) if not found
 	RDSStoragePricePerGBMonth(volumeType string) (float64, bool)
+
+	// EKSClusterPricePerHour returns hourly rate for EKS cluster control plane
+	// Returns (price, true) if found, (0, false) if not found
+	EKSClusterPricePerHour() (float64, bool)
 }
 
 // Client implements PricingClient with embedded JSON data
@@ -54,6 +56,9 @@ type Client struct {
 	// RDS pricing indexes (key: "instanceType/engine" for instances, "volumeType" for storage)
 	rdsInstanceIndex map[string]rdsInstancePrice
 	rdsStorageIndex  map[string]rdsStoragePrice
+
+	// EKS pricing (single cluster rate)
+	eksPricing *eksPrice
 }
 
 // NewClient creates a Client from embedded rawPricingJSON
@@ -182,8 +187,8 @@ func (c *Client) init() error {
 			// --- RDS Database Instances ---
 			// RDS uses productFamily="Database Instance" for compute pricing
 			if prod.ProductFamily == "Database Instance" {
-				instClass := attrs["instanceType"]     // e.g., "db.t3.medium"
-				engine := attrs["databaseEngine"]      // e.g., "MySQL", "PostgreSQL"
+				instClass := attrs["instanceType"] // e.g., "db.t3.medium"
+				engine := attrs["databaseEngine"]  // e.g., "MySQL", "PostgreSQL"
 				deployOption := attrs["deploymentOption"]
 
 				// Filter for Single-AZ On-Demand instances only
@@ -251,6 +256,23 @@ func (c *Client) init() error {
 					}
 				}
 			}
+
+			// --- EKS Cluster Control Plane ---
+			// EKS uses servicecode="AmazonEKS"
+			if attrs["servicecode"] == "AmazonEKS" {
+				// For EKS, we just need to find any product with hourly pricing
+				// EKS has uniform pricing, so we can pick the first one we find
+				if c.eksPricing == nil {
+					rate, unit, found := getOnDemandPrice(sku)
+					if found && unit == "Hrs" && rate > 0 {
+						c.eksPricing = &eksPrice{
+							Unit:       unit,
+							HourlyRate: rate,
+							Currency:   "USD",
+						}
+					}
+				}
+			}
 		}
 	})
 	return c.err
@@ -270,15 +292,6 @@ func (c *Client) Currency() string {
 
 // EC2OnDemandPricePerHour returns hourly rate for an EC2 instance
 func (c *Client) EC2OnDemandPricePerHour(instanceType, os, tenancy string) (float64, bool) {
-	start := time.Now()
-	defer func() {
-		elapsed := time.Since(start)
-		if elapsed > 50*time.Millisecond {
-			log.Printf("[pulumicost-plugin-aws-public] WARN: EC2 pricing lookup for %s/%s/%s took %v (>50ms)",
-				instanceType, os, tenancy, elapsed)
-		}
-	}()
-
 	if err := c.init(); err != nil {
 		return 0, false
 	}
@@ -293,15 +306,6 @@ func (c *Client) EC2OnDemandPricePerHour(instanceType, os, tenancy string) (floa
 
 // EBSPricePerGBMonth returns monthly rate per GB for an EBS volume
 func (c *Client) EBSPricePerGBMonth(volumeType string) (float64, bool) {
-	start := time.Now()
-	defer func() {
-		elapsed := time.Since(start)
-		if elapsed > 50*time.Millisecond {
-			log.Printf("[pulumicost-plugin-aws-public] WARN: EBS pricing lookup for %s took %v (>50ms)",
-				volumeType, elapsed)
-		}
-	}()
-
 	if err := c.init(); err != nil {
 		return 0, false
 	}
@@ -317,15 +321,6 @@ func (c *Client) EBSPricePerGBMonth(volumeType string) (float64, bool) {
 // instanceType: e.g., "db.t3.medium"
 // engine: normalized engine name, e.g., "MySQL", "PostgreSQL"
 func (c *Client) RDSOnDemandPricePerHour(instanceType, engine string) (float64, bool) {
-	start := time.Now()
-	defer func() {
-		elapsed := time.Since(start)
-		if elapsed > 50*time.Millisecond {
-			log.Printf("[pulumicost-plugin-aws-public] WARN: RDS pricing lookup for %s/%s took %v (>50ms)",
-				instanceType, engine, elapsed)
-		}
-	}()
-
 	if err := c.init(); err != nil {
 		return 0, false
 	}
@@ -341,15 +336,6 @@ func (c *Client) RDSOnDemandPricePerHour(instanceType, engine string) (float64, 
 // RDSStoragePricePerGBMonth returns monthly rate per GB for RDS storage
 // volumeType: e.g., "gp2", "gp3", "io1", "standard"
 func (c *Client) RDSStoragePricePerGBMonth(volumeType string) (float64, bool) {
-	start := time.Now()
-	defer func() {
-		elapsed := time.Since(start)
-		if elapsed > 50*time.Millisecond {
-			log.Printf("[pulumicost-plugin-aws-public] WARN: RDS storage pricing lookup for %s took %v (>50ms)",
-				volumeType, elapsed)
-		}
-	}()
-
 	if err := c.init(); err != nil {
 		return 0, false
 	}
@@ -359,4 +345,16 @@ func (c *Client) RDSStoragePricePerGBMonth(volumeType string) (float64, bool) {
 		return 0, false
 	}
 	return price.RatePerGBMonth, true
+}
+
+// EKSClusterPricePerHour returns hourly rate for EKS cluster control plane
+func (c *Client) EKSClusterPricePerHour() (float64, bool) {
+	if err := c.init(); err != nil {
+		return 0, false
+	}
+
+	if c.eksPricing == nil {
+		return 0, false
+	}
+	return c.eksPricing.HourlyRate, true
 }

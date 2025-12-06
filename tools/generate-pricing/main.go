@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -114,11 +116,23 @@ func generateCombinedPricingData(region string, services []string, outDir string
 	return nil
 }
 
+// httpRequestTimeout is the timeout for HTTP requests to AWS pricing API
+const httpRequestTimeout = 5 * time.Minute
+
 // fetchServicePricing fetches pricing data for a single AWS service
 func fetchServicePricing(region, service string) (*awsPricing, error) {
 	url := fmt.Sprintf("https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/%s/current/%s/index.json", service, region)
 
-	resp, err := http.Get(url)
+	// Create request with context for timeout support
+	ctx, cancel := context.WithTimeout(context.Background(), httpRequestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL: %w", err)
 	}
@@ -144,4 +158,3 @@ func fetchServicePricing(region, service string) (*awsPricing, error) {
 
 	return &data, nil
 }
-

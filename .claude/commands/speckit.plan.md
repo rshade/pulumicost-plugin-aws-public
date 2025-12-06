@@ -46,12 +46,14 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 2. **Generate and dispatch research agents**:
 
-   ```text
-   For each unknown in Technical Context:
-     Task: "Research {unknown} for {feature context}"
-   For each technology choice:
-     Task: "Find best practices for {tech} in {domain}"
-   ```
+    ```text
+    For each unknown in Technical Context:
+      Task: "Research {unknown} for {feature context}"
+    For each technology choice:
+      Task: "Find best practices for {tech} in {domain}"
+    ```
+
+    **Available Research Subagent**: Use `speckit.research` for specialized research tasks that require deep analysis and technology evaluation.
 
 3. **Consolidate findings** in `research.md` using format:
    - Decision: [what was chosen]

@@ -104,11 +104,11 @@ func TestParsePulumiResourceType(t *testing.T) {
 // TestGetStringAttr verifies string attribute extraction from protobuf Struct.
 func TestGetStringAttr(t *testing.T) {
 	tests := []struct {
-		name     string
-		attrs    *structpb.Struct
-		key      string
-		wantVal  string
-		wantOk   bool
+		name    string
+		attrs   *structpb.Struct
+		key     string
+		wantVal string
+		wantOk  bool
 	}{
 		{
 			name: "existing string attribute",
@@ -221,7 +221,7 @@ func TestGetNumberAttr(t *testing.T) {
 			},
 			key:     "size",
 			wantVal: 0,
-			wantOk:  false, // zero is treated as not found
+			wantOk:  true, // zero is a valid value when the attribute exists
 		},
 		{
 			name: "invalid string",
