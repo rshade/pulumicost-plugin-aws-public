@@ -1,6 +1,7 @@
 package pricing
 
-// awsPricing represents the structure of the official AWS Price List API JSON
+// awsPricing represents the structure of the official AWS Price List API JSON response.
+// It contains metadata, products catalog, and pricing terms.
 type awsPricing struct {
 	FormatVersion   string                                `json:"formatVersion"`
 	Disclaimer      string                                `json:"disclaimer"`
@@ -11,12 +12,16 @@ type awsPricing struct {
 	Terms           map[string]map[string]map[string]term `json:"terms"` // Type -> SKU -> OfferTermCode -> Term
 }
 
+// product represents an AWS product entry in the pricing data.
+// Each product has a SKU, family classification, and attributes.
 type product struct {
 	Sku           string            `json:"sku"`
 	ProductFamily string            `json:"productFamily"`
 	Attributes    map[string]string `json:"attributes"`
 }
 
+// term represents a pricing term offer (e.g., OnDemand, Reserved).
+// Contains offer details and associated price dimensions.
 type term struct {
 	OfferTermCode   string                    `json:"offerTermCode"`
 	Sku             string                    `json:"sku"`
@@ -24,6 +29,8 @@ type term struct {
 	PriceDimensions map[string]priceDimension `json:"priceDimensions"`
 }
 
+// priceDimension represents a specific pricing dimension within a term.
+// Contains rate information, unit of measure, and price per unit by currency.
 type priceDimension struct {
 	RateCode     string            `json:"rateCode"`
 	Description  string            `json:"description"`
@@ -34,13 +41,16 @@ type priceDimension struct {
 	AppliesTo    []string          `json:"appliesTo"`
 }
 
-// Internal lookup structures (distilled from raw JSON)
+// ec2Price represents the hourly compute cost for EC2 instances.
+// Distilled from raw AWS pricing JSON for fast lookups.
 type ec2Price struct {
 	Unit       string
 	HourlyRate float64
 	Currency   string
 }
 
+// ebsPrice represents the per-GB-month storage cost for EBS volumes.
+// Distilled from raw AWS pricing JSON for fast lookups.
 type ebsPrice struct {
 	Unit           string
 	RatePerGBMonth float64
@@ -59,4 +69,11 @@ type rdsStoragePrice struct {
 	Unit           string
 	RatePerGBMonth float64
 	Currency       string
+}
+
+// eksPrice represents the hourly cost for EKS cluster control plane
+type eksPrice struct {
+	Unit       string
+	HourlyRate float64
+	Currency   string
 }

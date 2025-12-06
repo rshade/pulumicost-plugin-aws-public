@@ -25,10 +25,12 @@ type mockPricingClient struct {
 	ebsPrices             map[string]float64 // key: "volumeType"
 	rdsInstancePrices     map[string]float64 // key: "instanceType/engine"
 	rdsStoragePrices      map[string]float64 // key: "volumeType"
+	eksPrice              float64            // EKS cluster hourly rate
 	ec2OnDemandCalled     int
 	ebsPriceCalled        int
 	rdsOnDemandCalled     int
 	rdsStoragePriceCalled int
+	eksPriceCalled        int
 }
 
 // newMockPricingClient creates a new mockPricingClient with default values.
@@ -75,6 +77,14 @@ func (m *mockPricingClient) RDSStoragePricePerGBMonth(volumeType string) (float6
 	m.rdsStoragePriceCalled++
 	price, found := m.rdsStoragePrices[volumeType]
 	return price, found
+}
+
+func (m *mockPricingClient) EKSClusterPricePerHour() (float64, bool) {
+	m.eksPriceCalled++
+	if m.eksPrice > 0 {
+		return m.eksPrice, true
+	}
+	return 0, false
 }
 
 func TestNewAWSPublicPlugin(t *testing.T) {

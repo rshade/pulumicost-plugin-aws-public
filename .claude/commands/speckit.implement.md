@@ -125,6 +125,11 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Suggest next steps if implementation cannot proceed
    - **IMPORTANT** For completed tasks, make sure to mark the task off as [X] in the tasks file.
 
+9. **Code Review Integration**:
+   - After completing implementation phases, run `speckit.code-review` on modified files
+   - Address critical and high-priority issues before marking tasks complete
+   - Use code review findings to improve code quality and constitution compliance
+
 9. Completion validation:
    - Verify all required tasks are completed
    - Check that implemented features match the original specification

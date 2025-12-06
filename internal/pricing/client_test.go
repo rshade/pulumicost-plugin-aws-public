@@ -254,3 +254,34 @@ func TestClient_RegionSpecificPricing(t *testing.T) {
 		}
 	}
 }
+
+func TestClient_EKSClusterPricePerHour(t *testing.T) {
+	t.Log("Starting EKS test")
+	client, err := NewClient(zerolog.Nop())
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
+
+	t.Logf("Client region: %s", client.Region())
+
+	price, found := client.EKSClusterPricePerHour()
+
+	t.Logf("EKS price lookup: found=%v, price=%v", found, price)
+
+	// EKS pricing should be available for known regions
+	if !found {
+		t.Errorf("EKSClusterPricePerHour() should return found=true, region=%s", client.Region())
+		return
+	}
+
+	// Verify price is reasonable (should be around $0.10/hour for standard support)
+	if price <= 0 {
+		t.Errorf("EKS price should be positive, got: %v", price)
+	}
+
+	if price > 1.0 {
+		t.Errorf("EKS price seems unreasonably high: %v (expected ~$0.10-$0.50/hour)", price)
+	}
+
+	t.Logf("EKS cluster hourly price = $%.4f", price)
+}

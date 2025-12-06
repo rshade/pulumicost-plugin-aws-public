@@ -140,6 +140,8 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 		resp, err = p.estimateEBS(traceID, resource)
 	case "rds":
 		resp, err = p.estimateRDS(traceID, resource)
+	case "eks":
+		resp, err = p.estimateEKS(traceID, resource)
 	case "s3", "lambda", "dynamodb":
 		resp, err = p.estimateStub(resource)
 	default:
@@ -471,20 +473,6 @@ func (p *AWSPublicPlugin) estimateRDS(traceID string, resource *pbc.ResourceDesc
 	}, nil
 }
 
-// detectService maps Pulumi resource types to supported service identifiers.
-//
-// This function handles multiple input formats:
-//   - Simple identifiers: "ec2", "ebs", "rds"
-//   - Pulumi formats: "aws:ec2/instance:Instance", "aws:ebs/volume:Volume"
-//   - Legacy formats: "aws:ec2:Instance"
-//
-// If no match is found, the input is returned as-is for backward compatibility.
-//
-// Examples:
-//
-//	detectService("ec2")                        -> "ec2"
-//	detectService("aws:ec2/instance:Instance")  -> "ec2"
-//	detectService("aws:ebs/volume:Volume")      -> "ebs"
 // detectService maps a provider resource type string to a normalized service identifier.
 // It returns one of "ec2", "ebs", "rds", "s3", "lambda", or "dynamodb" when a known mapping or pattern is found;
 // otherwise it returns the original resourceType unchanged.
@@ -518,4 +506,59 @@ func detectService(resourceType string) string {
 	}
 
 	return resourceType
+}
+
+// estimateEKS calculates projected monthly cost for EKS clusters.
+// EKS has a simple fixed hourly rate per cluster (standard or extended support).
+func (p *AWSPublicPlugin) estimateEKS(traceID string, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
+	// Determine support type from resource.Sku or tags
+	// resource.Sku = "cluster" (standard) or "cluster-extended" (extended support)
+	// OR use tags: tags["support_type"] == "extended"
+	extendedSupport := resource.Sku == "cluster-extended" ||
+		(resource.Tags != nil && resource.Tags["support_type"] == "extended")
+
+	// For EKS, we use a single pricing lookup regardless of support type
+	// The pricing data should contain the appropriate rate based on the filters
+	hourlyRate, found := p.pricing.EKSClusterPricePerHour()
+	if !found {
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "GetProjectedCost").
+			Str("aws_region", p.region).
+			Bool("extended_support", extendedSupport).
+			Msg("EKS pricing data not found")
+
+		return &pbc.GetProjectedCostResponse{
+			CostPerMonth:  0,
+			UnitPrice:     0,
+			Currency:      "USD",
+			BillingDetail: "EKS cluster pricing data not available for this region",
+		}, nil
+	}
+
+	// Debug log successful lookup
+	p.logger.Debug().
+		Str(pluginsdk.FieldTraceID, traceID).
+		Str(pluginsdk.FieldOperation, "GetProjectedCost").
+		Str("aws_region", p.region).
+		Bool("extended_support", extendedSupport).
+		Float64("hourly_rate", hourlyRate).
+		Msg("EKS pricing lookup successful")
+
+	// Calculate monthly cost (730 hours/month)
+	costPerMonth := hourlyRate * hoursPerMonth
+
+	// Determine support type description
+	supportType := "standard support"
+	if extendedSupport {
+		supportType = "extended support"
+	}
+
+	// Return response with billing details
+	return &pbc.GetProjectedCostResponse{
+		CostPerMonth:  costPerMonth,
+		UnitPrice:     hourlyRate,
+		Currency:      "USD",
+		BillingDetail: fmt.Sprintf("EKS cluster (%s), 730 hrs/month (control plane only, excludes worker nodes)", supportType),
+	}, nil
 }

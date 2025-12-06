@@ -155,17 +155,20 @@ func getStringAttr(attrs *structpb.Struct, key string) (string, bool) {
 }
 
 // getNumberAttr extracts a number attribute from a protobuf Struct.
+// Returns (value, true) if the key exists with a valid number, (0, false) otherwise.
+// Note: This correctly returns (0, true) when the attribute exists and is actually zero.
 func getNumberAttr(attrs *structpb.Struct, key string) (float64, bool) {
 	if attrs == nil || attrs.Fields == nil {
 		return 0, false
 	}
 	if val, ok := attrs.Fields[key]; ok {
-		if numVal := val.GetNumberValue(); numVal != 0 {
-			return numVal, true
-		}
-		// Also try string conversion
-		if strVal := val.GetStringValue(); strVal != "" {
-			if num, err := strconv.ParseFloat(strVal, 64); err == nil {
+		// Check if this is a number value (including zero)
+		switch v := val.GetKind().(type) {
+		case *structpb.Value_NumberValue:
+			return v.NumberValue, true
+		case *structpb.Value_StringValue:
+			// Also try string conversion for string representations of numbers
+			if num, err := strconv.ParseFloat(v.StringValue, 64); err == nil {
 				return num, true
 			}
 		}

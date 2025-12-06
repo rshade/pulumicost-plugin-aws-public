@@ -37,6 +37,10 @@ type PricingClient interface {
 	// volumeType: e.g., "gp2", "gp3", "io1"
 	// Returns (price, true) if found, (0, false) if not found
 	RDSStoragePricePerGBMonth(volumeType string) (float64, bool)
+
+	// EKSClusterPricePerHour returns hourly rate for EKS cluster control plane
+	// Returns (price, true) if found, (0, false) if not found
+	EKSClusterPricePerHour() (float64, bool)
 }
 
 // Client implements PricingClient with embedded JSON data
@@ -56,6 +60,9 @@ type Client struct {
 	// RDS pricing indexes (key: "instanceType/engine" for instances, "volumeType" for storage)
 	rdsInstanceIndex map[string]rdsInstancePrice
 	rdsStorageIndex  map[string]rdsStoragePrice
+
+	// EKS pricing (single cluster rate)
+	eksPricing *eksPrice
 }
 
 // NewClient creates a Client from embedded rawPricingJSON.
@@ -259,6 +266,23 @@ func (c *Client) init() error {
 					}
 				}
 			}
+
+			// --- EKS Cluster Control Plane ---
+			// EKS uses servicecode="AmazonEKS"
+			if attrs["servicecode"] == "AmazonEKS" {
+				// For EKS, we just need to find any product with hourly pricing
+				// EKS has uniform pricing, so we can pick the first one we find
+				if c.eksPricing == nil {
+					rate, unit, found := getOnDemandPrice(sku)
+					if found && unit == "Hrs" && rate > 0 {
+						c.eksPricing = &eksPrice{
+							Unit:       unit,
+							HourlyRate: rate,
+							Currency:   "USD",
+						}
+					}
+				}
+			}
 		}
 	})
 	return c.err
@@ -382,4 +406,16 @@ func (c *Client) RDSStoragePricePerGBMonth(volumeType string) (float64, bool) {
 		return 0, false
 	}
 	return price.RatePerGBMonth, true
+}
+
+// EKSClusterPricePerHour returns hourly rate for EKS cluster control plane
+func (c *Client) EKSClusterPricePerHour() (float64, bool) {
+	if err := c.init(); err != nil {
+		return 0, false
+	}
+
+	if c.eksPricing == nil {
+		return 0, false
+	}
+	return c.eksPricing.HourlyRate, true
 }

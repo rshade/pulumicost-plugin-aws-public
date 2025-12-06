@@ -1310,3 +1310,122 @@ func TestDetectService(t *testing.T) {
 		})
 	}
 }
+
+// TestGetProjectedCost_EKS_StandardSupport tests EKS standard support cost estimation
+func TestGetProjectedCost_EKS_StandardSupport(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	mock.eksPrice = 0.10 // $0.10/hour for standard support
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{
+			Provider:     "aws",
+			ResourceType: "eks",
+			Sku:          "cluster",
+			Region:       "us-east-1",
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("GetProjectedCost() returned error: %v", err)
+	}
+
+	// Verify cost calculation: 0.10 * 730 = 73.00
+	expectedCost := 0.10 * 730.0
+	if resp.CostPerMonth != expectedCost {
+		t.Errorf("CostPerMonth = %v, want %v", resp.CostPerMonth, expectedCost)
+	}
+
+	if resp.UnitPrice != 0.10 {
+		t.Errorf("UnitPrice = %v, want 0.10", resp.UnitPrice)
+	}
+
+	if resp.Currency != "USD" {
+		t.Errorf("Currency = %q, want %q", resp.Currency, "USD")
+	}
+
+	// Verify billing detail mentions standard support and control plane only
+	expectedDetail := "EKS cluster (standard support), 730 hrs/month (control plane only, excludes worker nodes)"
+	if resp.BillingDetail != expectedDetail {
+		t.Errorf("BillingDetail = %q, want %q", resp.BillingDetail, expectedDetail)
+	}
+
+	// Verify pricing client was called
+	if mock.eksPriceCalled != 1 {
+		t.Errorf("EKSClusterPricePerHour called %d times, want 1", mock.eksPriceCalled)
+	}
+}
+
+// TestGetProjectedCost_EKS_ExtendedSupport tests EKS extended support cost estimation
+func TestGetProjectedCost_EKS_ExtendedSupport(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	mock.eksPrice = 0.50 // $0.50/hour for extended support
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{
+			Provider:     "aws",
+			ResourceType: "eks",
+			Sku:          "cluster-extended",
+			Region:       "us-east-1",
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("GetProjectedCost() returned error: %v", err)
+	}
+
+	// Verify cost calculation: 0.50 * 730 = 365.00
+	expectedCost := 0.50 * 730.0
+	if resp.CostPerMonth != expectedCost {
+		t.Errorf("CostPerMonth = %v, want %v", resp.CostPerMonth, expectedCost)
+	}
+
+	if resp.UnitPrice != 0.50 {
+		t.Errorf("UnitPrice = %v, want 0.50", resp.UnitPrice)
+	}
+
+	// Verify billing detail mentions extended support
+	expectedDetail := "EKS cluster (extended support), 730 hrs/month (control plane only, excludes worker nodes)"
+	if resp.BillingDetail != expectedDetail {
+		t.Errorf("BillingDetail = %q, want %q", resp.BillingDetail, expectedDetail)
+	}
+}
+
+// TestGetProjectedCost_EKS_ExtendedSupportViaTags tests EKS extended support via tags
+func TestGetProjectedCost_EKS_ExtendedSupportViaTags(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	mock.eksPrice = 0.50 // $0.50/hour for extended support
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{
+			Provider:     "aws",
+			ResourceType: "eks",
+			Sku:          "cluster",
+			Region:       "us-east-1",
+			Tags: map[string]string{
+				"support_type": "extended",
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("GetProjectedCost() returned error: %v", err)
+	}
+
+	// Verify cost calculation: 0.50 * 730 = 365.00
+	expectedCost := 0.50 * 730.0
+	if resp.CostPerMonth != expectedCost {
+		t.Errorf("CostPerMonth = %v, want %v", resp.CostPerMonth, expectedCost)
+	}
+
+	// Verify billing detail mentions extended support
+	expectedDetail := "EKS cluster (extended support), 730 hrs/month (control plane only, excludes worker nodes)"
+	if resp.BillingDetail != expectedDetail {
+		t.Errorf("BillingDetail = %q, want %q", resp.BillingDetail, expectedDetail)
+	}
+}
