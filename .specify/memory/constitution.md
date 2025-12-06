@@ -1,13 +1,19 @@
 <!--
-Sync Impact Report - Constitution v2.1.0
+Sync Impact Report - Constitution v2.1.1
 ========================================
-Version Change: 2.0.0 → 2.1.0
-Rationale: MINOR update to document GetActualCost fallback implementation.
-           Feature 004-actual-cost-fallback implements pro-rated cost estimation
-           using projected monthly cost × (runtime_hours / 730).
+Version Change: 2.1.0 → 2.1.1
+Rationale: PATCH - Clarify logging requirements to explicitly specify zerolog
+           for structured JSON logging. Aligns constitution with CLAUDE.md and
+           actual implementation (main.go, testmode.go use zerolog).
 
 Modified Principles:
-  - III. Protocol & Interface Consistency: Updated GetActualCost method description
+  - III. Protocol & Interface Consistency: Clarified zerolog usage
+  - IV. Performance & Reliability: Clarified zerolog for performance monitoring
+
+Previous Sync Impact Report (v2.1.0):
+  - MINOR update to document GetActualCost fallback implementation
+  - Feature 004-actual-cost-fallback implements pro-rated cost estimation
+    using projected monthly cost × (runtime_hours / 730)
 
 Previous Sync Impact Report (v2.0.0):
   - MAJOR update to align with gRPC protocol instead of stdin/stdout JSON
@@ -17,9 +23,9 @@ Previous Sync Impact Report (v2.0.0):
   - Added gRPC Error Code enum compliance
 
 Templates Requiring Updates:
-  ✅ .specify/templates/plan-template.md - Constitution Check section verified
-  ✅ .specify/templates/spec-template.md - Requirements alignment verified
-  ✅ .specify/templates/tasks-template.md - Task categorization verified
+  ✅ .specify/templates/plan-template.md - No changes required
+  ✅ .specify/templates/spec-template.md - No changes required
+  ✅ .specify/templates/tasks-template.md - No changes required
 
 Follow-up TODOs:
   - None
@@ -75,7 +81,9 @@ Follow-up TODOs:
 
 - **gRPC CostSourceService protocol is sacred:**
   - NEVER log to stdout except PORT announcement
-  - All diagnostic logs go to stderr with `[pulumicost-plugin-aws-public]` prefix
+  - Use zerolog for structured JSON logging to stderr
+  - Log entries MUST include `[pulumicost-plugin-aws-public]` component identifier
+  - Support LOG_LEVEL environment variable for log level configuration
   - Use `pluginsdk.Serve()` for lifecycle management
 - **PORT announcement:** Plugin MUST write `PORT=<port>` to stdout exactly once, then serve gRPC on 127.0.0.1
 - **Proto-defined types only:**
@@ -121,8 +129,8 @@ Follow-up TODOs:
 
 **Performance monitoring:**
 
-- Log stderr warnings if pricing lookup takes > 50ms
-- Use structured logging for RPC timing if observability is added
+- Log warnings via zerolog if pricing lookup takes > 50ms
+- Use zerolog structured fields for RPC timing and trace_id propagation
 
 **Rationale:** The plugin may handle hundreds of concurrent RPC calls during a Pulumi stack analysis. Slow startup or inefficient lookups create poor user experience. Embedded data + indexing + thread-safe access ensures predictable performance without external dependencies.
 
@@ -214,4 +222,4 @@ Follow-up TODOs:
 - Constitution defines non-negotiable rules; CLAUDE.md provides practical implementation details
 - When CLAUDE.md conflicts with constitution, constitution wins
 
-**Version**: 2.1.0 | **Ratified**: 2025-11-16 | **Last Amended**: 2025-11-25
+**Version**: 2.1.1 | **Ratified**: 2025-11-16 | **Last Amended**: 2025-12-05
