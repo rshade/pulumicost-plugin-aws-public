@@ -12,6 +12,13 @@ import (
 	"time"
 )
 
+// main is the program entry point that fetches and writes combined AWS pricing data for one or more regions.
+// 
+// It parses command-line flags to determine regions (`--regions`), output directory (`--out-dir`), and
+// services (`--service`). The deprecated `--dummy` flag is accepted but ignored. For each region, it calls
+// generateCombinedPricingData to fetch pricing for the requested services and write a combined JSON file;
+// on any per-region error the program prints the error to stderr and exits with status 1. On success it prints
+// per-region and final completion messages.
 func main() {
 	regions := flag.String("regions", "us-east-1", "Comma-separated regions")
 	outDir := flag.String("out-dir", "./data", "Output directory")
@@ -49,7 +56,21 @@ type awsPricing struct {
 	Terms           map[string]map[string]json.RawMessage `json:"terms"`
 }
 
-// generateCombinedPricingData fetches and combines pricing data from multiple AWS services
+// generateCombinedPricingData fetches pricing data for each service in services,
+// combines their Products and OnDemand Terms into a single awsPricing value, and
+// writes the combined pricing JSON to a file named aws_pricing_<region>.json in outDir.
+//
+// The function skips empty service entries. The combined data will use "Combined"
+// as the OfferCode and inherits Version and PublicationDate from the first
+// successfully fetched service.
+//
+// Parameters:
+//   - region: AWS region used to fetch service pricing.
+//   - services: slice of AWS service codes to fetch and combine.
+//   - outDir: directory where the resulting JSON file will be written.
+//
+// Returns an error if any service fetch fails, if the output directory or file
+// cannot be created, or if encoding the combined pricing to JSON fails.
 func generateCombinedPricingData(region string, services []string, outDir string) error {
 	// Combined pricing structure
 	combined := awsPricing{
@@ -119,7 +140,10 @@ func generateCombinedPricingData(region string, services []string, outDir string
 // httpRequestTimeout is the timeout for HTTP requests to AWS pricing API
 const httpRequestTimeout = 5 * time.Minute
 
-// fetchServicePricing fetches pricing data for a single AWS service
+// fetchServicePricing retrieves the AWS Price List API payload for a single service in the specified region.
+// It requests the service's pricing index JSON, parses it, and returns the resulting awsPricing structure.
+// The function returns an error if the HTTP request fails, the response status is not 200 OK, the response
+// body cannot be read, or the JSON cannot be parsed into awsPricing.
 func fetchServicePricing(region, service string) (*awsPricing, error) {
 	url := fmt.Sprintf("https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/%s/current/%s/index.json", service, region)
 

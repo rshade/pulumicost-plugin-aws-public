@@ -156,7 +156,12 @@ func getStringAttr(attrs *structpb.Struct, key string) (string, bool) {
 
 // getNumberAttr extracts a number attribute from a protobuf Struct.
 // Returns (value, true) if the key exists with a valid number, (0, false) otherwise.
-// Note: This correctly returns (0, true) when the attribute exists and is actually zero.
+// getNumberAttr returns the numeric value stored under key in attrs and a boolean
+// indicating whether a valid number was found.
+// It accepts both protobuf numeric values and string values that can be parsed as numbers.
+// If the attribute exists and is a valid number (including zero), the numeric value and
+// true are returned. If the attribute is missing or not a valid number, 0 and false are returned.
+// attrs is the protobuf Struct to read from; key is the field name to look up.
 func getNumberAttr(attrs *structpb.Struct, key string) (float64, bool) {
 	if attrs == nil || attrs.Fields == nil {
 		return 0, false
