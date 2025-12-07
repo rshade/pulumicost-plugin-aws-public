@@ -31,7 +31,7 @@ func main() {
 	plugin.ValidateTestModeEnv(logger)
 
 	// Initialize pricing client
-	pricingClient, err := pricing.NewClient()
+	pricingClient, err := pricing.NewClient(logger)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to initialize pricing client")
 		os.Exit(1)

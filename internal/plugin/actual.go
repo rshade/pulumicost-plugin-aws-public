@@ -7,6 +7,8 @@ import (
 	pbc "github.com/rshade/pulumicost-spec/sdk/go/proto/pulumicost/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/rshade/pulumicost-spec/sdk/go/pluginsdk"
 )
 
 // calculateRuntimeHours computes the duration between two timestamps in hours.
@@ -49,8 +51,19 @@ func (p *AWSPublicPlugin) getProjectedForResource(traceID string, resource *pbc.
 		}
 
 		st := status.New(codes.FailedPrecondition, errDetail.Message)
-		st, _ = st.WithDetails(errDetail)
-		return nil, st.Err()
+		stWithDetails, err := st.WithDetails(errDetail)
+		if err != nil {
+			// Log a warning if details could not be attached
+			p.logger.Warn().
+				Str(pluginsdk.FieldTraceID, traceID). // Use traceID directly here
+				Str("grpc_code", codes.FailedPrecondition.String()).
+				Str("message", errDetail.Message).
+				Str("error_code", pbc.ErrorCode_ERROR_CODE_UNSUPPORTED_REGION.String()).
+				Err(err). // Log the error returned by WithDetails
+				Msg("failed to attach error details to gRPC status for region mismatch in actual cost calculation")
+			return nil, st.Err() // Return original status without details
+		}
+		return nil, stWithDetails.Err()
 	}
 
 	// Route to appropriate estimator based on resource type

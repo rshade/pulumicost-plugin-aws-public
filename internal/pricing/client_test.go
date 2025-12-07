@@ -2,10 +2,12 @@ package pricing
 
 import (
 	"testing"
+
+	"github.com/rs/zerolog"
 )
 
 func TestNewClient(t *testing.T) {
-	client, err := NewClient()
+	client, err := NewClient(zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewClient() failed: %v", err)
 	}
@@ -25,7 +27,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestClient_EC2OnDemandPricePerHour(t *testing.T) {
-	client, err := NewClient()
+	client, err := NewClient(zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewClient() failed: %v", err)
 	}
@@ -96,7 +98,7 @@ func TestClient_EC2OnDemandPricePerHour(t *testing.T) {
 }
 
 func TestClient_EBSPricePerGBMonth(t *testing.T) {
-	client, err := NewClient()
+	client, err := NewClient(zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewClient() failed: %v", err)
 	}
@@ -158,7 +160,7 @@ func TestClient_EBSPricePerGBMonth(t *testing.T) {
 }
 
 func TestClient_ConcurrentAccess(t *testing.T) {
-	client, err := NewClient()
+	client, err := NewClient(zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewClient() failed: %v", err)
 	}
@@ -184,7 +186,7 @@ func TestClient_ConcurrentAccess(t *testing.T) {
 // TestClient_APSoutheast1 tests pricing data loading for ap-southeast-1 (T012)
 // Note: This test validates the structure; actual region will depend on build tag
 func TestClient_APSoutheast1_DataStructure(t *testing.T) {
-	client, err := NewClient()
+	client, err := NewClient(zerolog.Nop()) // Pass zerolog.Nop() here
 	if err != nil {
 		t.Fatalf("NewClient() failed: %v", err)
 	}
@@ -217,7 +219,7 @@ func TestClient_APSoutheast1_DataStructure(t *testing.T) {
 
 // TestClient_RegionSpecificPricing tests that region-specific pricing is loaded correctly (T012)
 func TestClient_RegionSpecificPricing(t *testing.T) {
-	client, err := NewClient()
+	client, err := NewClient(zerolog.Nop()) // Pass zerolog.Nop() here
 	if err != nil {
 		t.Fatalf("NewClient() failed: %v", err)
 	}

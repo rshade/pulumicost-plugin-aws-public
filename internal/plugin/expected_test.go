@@ -7,12 +7,12 @@ import (
 
 func TestGetExpectedRange(t *testing.T) {
 	tests := []struct {
-		name         string
-		resourceType string
-		sku          string
-		region       string
-		wantFound    bool
-		wantMonthly  float64
+		name          string
+		resourceType  string
+		sku           string
+		region        string
+		wantFound     bool
+		wantMonthly   float64
 		wantTolerance float64
 	}{
 		{
@@ -78,10 +78,10 @@ func TestGetExpectedRange(t *testing.T) {
 
 func TestExpectedCostRange_MinMax(t *testing.T) {
 	tests := []struct {
-		name     string
-		range_   ExpectedCostRange
-		wantMin  float64
-		wantMax  float64
+		name    string
+		range_  ExpectedCostRange
+		wantMin float64
+		wantMax float64
 	}{
 		{
 			name: "EC2 1% tolerance",
@@ -129,11 +129,11 @@ func TestExpectedCostRange_MinMax(t *testing.T) {
 
 func TestIsWithinTolerance(t *testing.T) {
 	tests := []struct {
-		name       string
-		actual     float64
-		expected   float64
-		tolerance  float64
-		want       bool
+		name      string
+		actual    float64
+		expected  float64
+		tolerance float64
+		want      bool
 	}{
 		{
 			name:      "exactly at expected",
@@ -213,10 +213,10 @@ func TestIsWithinTolerance(t *testing.T) {
 
 func TestCalculateExpectedActualCost(t *testing.T) {
 	tests := []struct {
-		name          string
-		projected     float64
-		runtimeHours  float64
-		want          float64
+		name         string
+		projected    float64
+		runtimeHours float64
+		want         float64
 	}{
 		{
 			name:         "30 minutes for t3.micro",

@@ -3,11 +3,12 @@ package pricing
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // PricingClient provides pricing data lookups
@@ -42,6 +43,7 @@ type PricingClient interface {
 type Client struct {
 	region   string
 	currency string
+	logger   zerolog.Logger // Add zerolog logger
 
 	// Thread-safe initialization
 	once sync.Once
@@ -56,9 +58,12 @@ type Client struct {
 	rdsStorageIndex  map[string]rdsStoragePrice
 }
 
-// NewClient creates a Client from embedded rawPricingJSON
-func NewClient() (*Client, error) {
-	c := &Client{}
+// NewClient creates a Client from embedded rawPricingJSON.
+// The provided logger is used for performance warnings during pricing lookups.
+func NewClient(logger zerolog.Logger) (*Client, error) {
+	c := &Client{
+		logger: logger, // Initialize the logger
+	}
 	if err := c.init(); err != nil {
 		return nil, err
 	}
@@ -182,8 +187,8 @@ func (c *Client) init() error {
 			// --- RDS Database Instances ---
 			// RDS uses productFamily="Database Instance" for compute pricing
 			if prod.ProductFamily == "Database Instance" {
-				instClass := attrs["instanceType"]     // e.g., "db.t3.medium"
-				engine := attrs["databaseEngine"]      // e.g., "MySQL", "PostgreSQL"
+				instClass := attrs["instanceType"] // e.g., "db.t3.medium"
+				engine := attrs["databaseEngine"]  // e.g., "MySQL", "PostgreSQL"
 				deployOption := attrs["deploymentOption"]
 
 				// Filter for Single-AZ On-Demand instances only
@@ -274,8 +279,13 @@ func (c *Client) EC2OnDemandPricePerHour(instanceType, os, tenancy string) (floa
 	defer func() {
 		elapsed := time.Since(start)
 		if elapsed > 50*time.Millisecond {
-			log.Printf("[pulumicost-plugin-aws-public] WARN: EC2 pricing lookup for %s/%s/%s took %v (>50ms)",
-				instanceType, os, tenancy, elapsed)
+			c.logger.Warn().
+				Str("resource_type", "EC2").
+				Str("instance_type", instanceType).
+				Str("os", os).
+				Str("tenancy", tenancy).
+				Dur("elapsed", elapsed).
+				Msg("pricing lookup took too long")
 		}
 	}()
 
@@ -297,8 +307,11 @@ func (c *Client) EBSPricePerGBMonth(volumeType string) (float64, bool) {
 	defer func() {
 		elapsed := time.Since(start)
 		if elapsed > 50*time.Millisecond {
-			log.Printf("[pulumicost-plugin-aws-public] WARN: EBS pricing lookup for %s took %v (>50ms)",
-				volumeType, elapsed)
+			c.logger.Warn().
+				Str("resource_type", "EBS").
+				Str("volume_type", volumeType).
+				Dur("elapsed", elapsed).
+				Msg("pricing lookup took too long")
 		}
 	}()
 
@@ -321,8 +334,12 @@ func (c *Client) RDSOnDemandPricePerHour(instanceType, engine string) (float64, 
 	defer func() {
 		elapsed := time.Since(start)
 		if elapsed > 50*time.Millisecond {
-			log.Printf("[pulumicost-plugin-aws-public] WARN: RDS pricing lookup for %s/%s took %v (>50ms)",
-				instanceType, engine, elapsed)
+			c.logger.Warn().
+				Str("resource_type", "RDS").
+				Str("instance_type", instanceType).
+				Str("engine", engine).
+				Dur("elapsed", elapsed).
+				Msg("pricing lookup took too long")
 		}
 	}()
 
@@ -345,8 +362,11 @@ func (c *Client) RDSStoragePricePerGBMonth(volumeType string) (float64, bool) {
 	defer func() {
 		elapsed := time.Since(start)
 		if elapsed > 50*time.Millisecond {
-			log.Printf("[pulumicost-plugin-aws-public] WARN: RDS storage pricing lookup for %s took %v (>50ms)",
-				volumeType, elapsed)
+			c.logger.Warn().
+				Str("resource_type", "RDS_Storage").
+				Str("volume_type", volumeType).
+				Dur("elapsed", elapsed).
+				Msg("pricing lookup took too long")
 		}
 	}()
 

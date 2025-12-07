@@ -560,7 +560,7 @@ func TestGetActualCostWithInvalidResourceJSON(t *testing.T) {
 
 	req := &pbc.GetActualCostRequest{
 		ResourceId: "{invalid-json-garbage", // Malformed JSON
-		Tags:       nil,                      // No tags to fallback to
+		Tags:       nil,                     // No tags to fallback to
 		Start:      timestamppb.New(from),
 		End:        timestamppb.New(to),
 	}
@@ -575,4 +575,3 @@ func TestGetActualCostWithInvalidResourceJSON(t *testing.T) {
 		}
 	}
 }
-

@@ -177,6 +177,16 @@ From `pulumicost.v1.ResourceDescriptor`:
 - `region`: AWS region (e.g., "us-east-1")
 - `tags`: Key-value pairs; for EBS, may contain "size" or "volume_size"
 
+### Supported Resource Type Formats
+
+The plugin accepts multiple resource type formats:
+
+1. **Simple identifiers** (legacy): `ec2`, `ebs`, `rds`
+2. **Pulumi format** (preferred): `aws:ec2/instance:Instance`, `aws:ebs/volume:Volume`
+3. **Short Pulumi format**: `aws:ec2:Instance`
+
+All formats are normalized internally via the `detectService()` function in `internal/plugin/projected.go`.
+
 ### ErrorCode Enum
 From `pulumicost.v1.ErrorCode`:
 - `ERROR_CODE_UNSUPPORTED_REGION` (9): Region not supported by this binary

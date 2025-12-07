@@ -19,15 +19,15 @@ import (
 
 // mockPricingClient is a test double for pricing.PricingClient.
 type mockPricingClient struct {
-	region               string
-	currency             string
-	ec2Prices            map[string]float64 // key: "instanceType/os/tenancy"
-	ebsPrices            map[string]float64 // key: "volumeType"
-	rdsInstancePrices    map[string]float64 // key: "instanceType/engine"
-	rdsStoragePrices     map[string]float64 // key: "volumeType"
-	ec2OnDemandCalled    int
-	ebsPriceCalled       int
-	rdsOnDemandCalled    int
+	region                string
+	currency              string
+	ec2Prices             map[string]float64 // key: "instanceType/os/tenancy"
+	ebsPrices             map[string]float64 // key: "volumeType"
+	rdsInstancePrices     map[string]float64 // key: "instanceType/engine"
+	rdsStoragePrices      map[string]float64 // key: "volumeType"
+	ec2OnDemandCalled     int
+	ebsPriceCalled        int
+	rdsOnDemandCalled     int
 	rdsStoragePriceCalled int
 }
 

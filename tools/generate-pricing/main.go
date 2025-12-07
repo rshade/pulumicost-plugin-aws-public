@@ -144,4 +144,3 @@ func fetchServicePricing(region, service string) (*awsPricing, error) {
 
 	return &data, nil
 }
-
