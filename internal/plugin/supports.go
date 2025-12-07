@@ -64,8 +64,11 @@ func (p *AWSPublicPlugin) Supports(ctx context.Context, req *pbc.SupportsRequest
 		}, nil
 	}
 
+	// Normalize resource type (handles Pulumi formats like aws:eks/cluster:Cluster)
+	normalizedType := detectService(resource.ResourceType)
+
 	// Check resource type
-	switch resource.ResourceType {
+	switch normalizedType {
 	case "ec2", "ebs", "rds", "eks":
 		// Fully supported
 		p.logger.Info().

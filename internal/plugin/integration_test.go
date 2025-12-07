@@ -396,6 +396,11 @@ func TestIntegration_TraceIDPropagation(t *testing.T) {
 //   - Verifies support type detection (standard vs extended)
 //   - Tests both SKU and tag-based extended support detection
 //
+// Production scenarios validated:
+//  1. Standard support (default): Common case for new clusters using default SKU
+//  2. Extended support via SKU: Explicitly requesting extended tier via resource SKU
+//  3. Extended support via tag: Infrastructure-as-code pattern using feature flags in tags
+//
 // Prerequisites:
 //   - Go toolchain available for building
 //   - us-east-1 binary with EKS pricing data
@@ -405,10 +410,10 @@ func TestIntegration_EKS_UseEast1_Binary(t *testing.T) {
 	// Build the binary with region_use1 tag
 	t.Log("Building us-east-1 binary for EKS testing...")
 	buildCmd := exec.Command("go", "build",
-		"-tags=region_use1",
-		"-o", "test-pulumicost-plugin-aws-public-us-east-1",
-		"cmd/pulumicost-plugin-aws-public/main.go")
-
+		"-tags", "region_use1",
+		"-o", "../../dist/test-pulumicost-plugin-aws-public-us-east-1",
+		"../../cmd/pulumicost-plugin-aws-public")
+	buildCmd.Dir, _ = os.Getwd()
 	output, err := buildCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Failed to build binary: %v\nOutput: %s", err, string(output))
@@ -416,14 +421,14 @@ func TestIntegration_EKS_UseEast1_Binary(t *testing.T) {
 
 	// Ensure cleanup
 	defer func() {
-		if err := os.Remove("test-pulumicost-plugin-aws-public-us-east-1"); err != nil {
+		if err := os.Remove("../../dist/test-pulumicost-plugin-aws-public-us-east-1"); err != nil {
 			t.Logf("Warning: failed to cleanup test binary: %v", err)
 		}
 	}()
 
 	// Start the binary
 	t.Log("Starting us-east-1 binary...")
-	cmd := exec.Command("./test-pulumicost-plugin-aws-public-us-east-1")
+	cmd := exec.Command("../../dist/test-pulumicost-plugin-aws-public-us-east-1")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatalf("Failed to get stdout pipe: %v", err)

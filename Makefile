@@ -48,7 +48,7 @@ verify-regions: ## Verify region configuration and generated files
 .PHONY: lint
 lint: ## Run golangci-lint
 	@echo "Running linter..."
-	@golangci-lint run ./...
+	@golangci-lint run --allow-parallel-runners ./...
 
 .PHONY: test
 test: ## Run all tests

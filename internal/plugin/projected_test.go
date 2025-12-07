@@ -1315,7 +1315,8 @@ func TestDetectService(t *testing.T) {
 func TestGetProjectedCost_EKS_StandardSupport(t *testing.T) {
 	mock := newMockPricingClient("us-east-1", "USD")
 	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
-	mock.eksPrice = 0.10 // $0.10/hour for standard support
+	mock.eksStandardPrice = 0.10 // $0.10/hour for standard support
+	mock.eksExtendedPrice = 0.50 // $0.50/hour for extended support
 	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
 
 	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
@@ -1361,7 +1362,8 @@ func TestGetProjectedCost_EKS_StandardSupport(t *testing.T) {
 func TestGetProjectedCost_EKS_ExtendedSupport(t *testing.T) {
 	mock := newMockPricingClient("us-east-1", "USD")
 	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
-	mock.eksPrice = 0.50 // $0.50/hour for extended support
+	mock.eksStandardPrice = 0.10 // $0.10/hour for standard support
+	mock.eksExtendedPrice = 0.50 // $0.50/hour for extended support
 	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
 
 	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
@@ -1398,7 +1400,8 @@ func TestGetProjectedCost_EKS_ExtendedSupport(t *testing.T) {
 func TestGetProjectedCost_EKS_ExtendedSupportViaTags(t *testing.T) {
 	mock := newMockPricingClient("us-east-1", "USD")
 	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
-	mock.eksPrice = 0.50 // $0.50/hour for extended support
+	mock.eksStandardPrice = 0.10 // $0.10/hour for standard support
+	mock.eksExtendedPrice = 0.50 // $0.50/hour for extended support
 	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
 
 	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{

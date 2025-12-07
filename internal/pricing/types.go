@@ -71,9 +71,13 @@ type rdsStoragePrice struct {
 	Currency       string
 }
 
-// eksPrice represents the hourly cost for EKS cluster control plane
+// eksPrice represents the hourly cost for EKS cluster control plane.
+// EKS offers two support tiers with different pricing:
+//   - Standard support: ~$0.10/cluster-hour
+//   - Extended support: ~$0.50/cluster-hour (for clusters on older Kubernetes versions)
 type eksPrice struct {
-	Unit       string
-	HourlyRate float64
-	Currency   string
+	Unit               string
+	StandardHourlyRate float64 // Standard support hourly rate
+	ExtendedHourlyRate float64 // Extended support hourly rate
+	Currency           string
 }

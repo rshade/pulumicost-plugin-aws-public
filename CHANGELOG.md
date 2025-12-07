@@ -5,7 +5,7 @@
 
 ### Features
 
-* **eks:** add EKS cluster cost estimation support ([#010](https://github.com/rshade/pulumicost-plugin-aws-public/issues/010)) ([TBD](https://github.com/rshade/pulumicost-plugin-aws-public/commit/TBD))
+* **eks:** add EKS cluster cost estimation support ([#57](https://github.com/rshade/pulumicost-plugin-aws-public/issues/57))
 
 ### Bug Fixes
 

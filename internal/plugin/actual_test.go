@@ -56,7 +56,10 @@ func (m *mockPricingClientActual) RDSStoragePricePerGBMonth(volumeType string) (
 	return price, ok
 }
 
-func (m *mockPricingClientActual) EKSClusterPricePerHour() (float64, bool) {
+func (m *mockPricingClientActual) EKSClusterPricePerHour(extendedSupport bool) (float64, bool) {
+	if extendedSupport {
+		return 0.50, true // Extended EKS rate
+	}
 	return 0.10, true // Standard EKS rate
 }
 

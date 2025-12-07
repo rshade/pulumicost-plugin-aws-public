@@ -25,7 +25,8 @@ type mockPricingClient struct {
 	ebsPrices             map[string]float64 // key: "volumeType"
 	rdsInstancePrices     map[string]float64 // key: "instanceType/engine"
 	rdsStoragePrices      map[string]float64 // key: "volumeType"
-	eksPrice              float64            // EKS cluster hourly rate
+	eksStandardPrice      float64            // EKS cluster standard support hourly rate
+	eksExtendedPrice      float64            // EKS cluster extended support hourly rate
 	ec2OnDemandCalled     int
 	ebsPriceCalled        int
 	rdsOnDemandCalled     int
@@ -79,10 +80,16 @@ func (m *mockPricingClient) RDSStoragePricePerGBMonth(volumeType string) (float6
 	return price, found
 }
 
-func (m *mockPricingClient) EKSClusterPricePerHour() (float64, bool) {
+func (m *mockPricingClient) EKSClusterPricePerHour(extendedSupport bool) (float64, bool) {
 	m.eksPriceCalled++
-	if m.eksPrice > 0 {
-		return m.eksPrice, true
+	if extendedSupport {
+		if m.eksExtendedPrice > 0 {
+			return m.eksExtendedPrice, true
+		}
+		return 0, false
+	}
+	if m.eksStandardPrice > 0 {
+		return m.eksStandardPrice, true
 	}
 	return 0, false
 }

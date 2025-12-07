@@ -38,6 +38,9 @@ const (
 
 	resTypeDynamoDBTableLegacy = "aws:dynamodb:table"
 	resTypeDynamoDBTable       = "aws:dynamodb/table:table"
+
+	resTypeEKSClusterLegacy = "aws:eks:cluster"
+	resTypeEKSCluster       = "aws:eks/cluster:cluster"
 )
 
 // engineNormalization maps user-friendly engine names to AWS pricing API identifiers.
@@ -492,6 +495,8 @@ func detectService(resourceType string) string {
 		return "lambda"
 	case "dynamodb", resTypeDynamoDBTable, resTypeDynamoDBTableLegacy:
 		return "dynamodb"
+	case "eks", resTypeEKSCluster, resTypeEKSClusterLegacy:
+		return "eks"
 	}
 
 	// Fallback: simple containment check for common patterns
@@ -503,6 +508,9 @@ func detectService(resourceType string) string {
 	}
 	if strings.Contains(resourceTypeLower, "rds/instance") {
 		return "rds"
+	}
+	if strings.Contains(resourceTypeLower, "eks/cluster") {
+		return "eks"
 	}
 
 	return resourceType
@@ -517,9 +525,8 @@ func (p *AWSPublicPlugin) estimateEKS(traceID string, resource *pbc.ResourceDesc
 	extendedSupport := resource.Sku == "cluster-extended" ||
 		(resource.Tags != nil && resource.Tags["support_type"] == "extended")
 
-	// For EKS, we use a single pricing lookup regardless of support type
-	// The pricing data should contain the appropriate rate based on the filters
-	hourlyRate, found := p.pricing.EKSClusterPricePerHour()
+	// Look up EKS pricing based on support type
+	hourlyRate, found := p.pricing.EKSClusterPricePerHour(extendedSupport)
 	if !found {
 		p.logger.Debug().
 			Str(pluginsdk.FieldTraceID, traceID).

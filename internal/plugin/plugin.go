@@ -74,6 +74,10 @@ func (p *AWSPublicPlugin) getTraceID(ctx context.Context) string {
 
 const maxTagsToLog = 5
 
+// sanitizeTagsForLogging returns a sanitized subset of the input tags suitable for logging.
+// It returns nil if tags is nil. The result contains at most maxTagsToLog entries,
+// excludes any entries whose key (case-insensitive) contains "secret", "password", or "token",
+// and preserves the original key casing for included entries.
 func sanitizeTagsForLogging(tags map[string]string) map[string]string {
 	if tags == nil {
 		return nil
