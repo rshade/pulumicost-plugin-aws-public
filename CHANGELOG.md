@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.8](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.7...v0.0.8) (2025-12-07)
+
+
+### Features
+
+* **eks:** add EKS pricing validation and missing pricing test coverage ([#93](https://github.com/rshade/pulumicost-plugin-aws-public/issues/93)) ([de697c4](https://github.com/rshade/pulumicost-plugin-aws-public/commit/de697c49f36ddf6eb6e16c313e8582e38ed8ed52)), closes [#90](https://github.com/rshade/pulumicost-plugin-aws-public/issues/90)
+
+
+### Bug Fixes
+
+* **eks:** resolve pricing parser zero-value bug and case-sensitive support_type ([#95](https://github.com/rshade/pulumicost-plugin-aws-public/issues/95)) ([8b24250](https://github.com/rshade/pulumicost-plugin-aws-public/commit/8b24250104126abc9dc6e08d144f73220883072c)), closes [#89](https://github.com/rshade/pulumicost-plugin-aws-public/issues/89)
+
+
+### Documentation
+
+* **eks:** clarify EKS cost estimation scope in CLAUDE.md ([#92](https://github.com/rshade/pulumicost-plugin-aws-public/issues/92)) ([bac39ac](https://github.com/rshade/pulumicost-plugin-aws-public/commit/bac39ac9bb318d339f1c4f6dd662775bd6a23015))
+
 ## [0.0.7](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.6...v0.0.7) (2025-12-07)
 
 
