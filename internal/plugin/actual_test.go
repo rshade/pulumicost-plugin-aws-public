@@ -56,6 +56,13 @@ func (m *mockPricingClientActual) RDSStoragePricePerGBMonth(volumeType string) (
 	return price, ok
 }
 
+func (m *mockPricingClientActual) EKSClusterPricePerHour(extendedSupport bool) (float64, bool) {
+	if extendedSupport {
+		return 0.50, true // Extended EKS rate
+	}
+	return 0.10, true // Standard EKS rate
+}
+
 func newTestPluginForActual() *AWSPublicPlugin {
 	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
 	return NewAWSPublicPlugin("us-east-1", &mockPricingClientActual{

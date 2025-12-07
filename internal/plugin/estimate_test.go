@@ -221,7 +221,7 @@ func TestGetNumberAttr(t *testing.T) {
 			},
 			key:     "size",
 			wantVal: 0,
-			wantOk:  false, // zero is treated as not found
+			wantOk:  true, // zero is a valid value when the attribute exists
 		},
 		{
 			name: "invalid string",

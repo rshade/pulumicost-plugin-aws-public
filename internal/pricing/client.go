@@ -37,6 +37,11 @@ type PricingClient interface {
 	// volumeType: e.g., "gp2", "gp3", "io1"
 	// Returns (price, true) if found, (0, false) if not found
 	RDSStoragePricePerGBMonth(volumeType string) (float64, bool)
+
+	// EKSClusterPricePerHour returns hourly rate for EKS cluster control plane.
+	// extendedSupport: true for extended support pricing, false for standard support.
+	// Returns (price, true) if found, (0, false) if not found.
+	EKSClusterPricePerHour(extendedSupport bool) (float64, bool)
 }
 
 // Client implements PricingClient with embedded JSON data
@@ -56,6 +61,9 @@ type Client struct {
 	// RDS pricing indexes (key: "instanceType/engine" for instances, "volumeType" for storage)
 	rdsInstanceIndex map[string]rdsInstancePrice
 	rdsStorageIndex  map[string]rdsStoragePrice
+
+	// EKS pricing (single cluster rate)
+	eksPricing *eksPrice
 }
 
 // NewClient creates a Client from embedded rawPricingJSON.
@@ -259,6 +267,39 @@ func (c *Client) init() error {
 					}
 				}
 			}
+
+			// --- EKS Cluster Control Plane ---
+			// EKS uses servicecode="AmazonEKS" with two support tiers:
+			// - Standard support: operation="CreateOperation", usagetype contains "perCluster"
+			// - Extended support: operation="ExtendedSupport", usagetype contains "extendedSupport"
+			if attrs["servicecode"] == "AmazonEKS" {
+				operation := attrs["operation"]
+				usageType := attrs["usagetype"]
+
+				// Initialize eksPrice struct if nil
+				if c.eksPricing == nil {
+					c.eksPricing = &eksPrice{
+						Unit:     "Hrs",
+						Currency: "USD",
+					}
+				}
+
+				rate, unit, found := getOnDemandPrice(sku)
+				if found && unit == "Hrs" && rate > 0 {
+					// Extended support: ExtendedSupport operation or extendedSupport in usagetype
+					if operation == "ExtendedSupport" || strings.Contains(usageType, "extendedSupport") {
+						if c.eksPricing.ExtendedHourlyRate == 0 {
+							c.eksPricing.ExtendedHourlyRate = rate
+						}
+					} else {
+						// Standard support: CreateOperation with perCluster, or any non-extended EKS pricing
+						// This includes legacy data that doesn't have specific operation/usagetype
+						if c.eksPricing.StandardHourlyRate == 0 {
+							c.eksPricing.StandardHourlyRate = rate
+						}
+					}
+				}
+			}
 		}
 	})
 	return c.err
@@ -382,4 +423,40 @@ func (c *Client) RDSStoragePricePerGBMonth(volumeType string) (float64, bool) {
 		return 0, false
 	}
 	return price.RatePerGBMonth, true
+}
+
+// EKSClusterPricePerHour returns hourly rate for EKS cluster control plane.
+// extendedSupport: true for extended support pricing, false for standard support.
+func (c *Client) EKSClusterPricePerHour(extendedSupport bool) (float64, bool) {
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		if elapsed > 50*time.Millisecond {
+			c.logger.Warn().
+				Str("resource_type", "EKS").
+				Bool("extended_support", extendedSupport).
+				Dur("elapsed", elapsed).
+				Msg("pricing lookup took too long")
+		}
+	}()
+
+	if err := c.init(); err != nil {
+		return 0, false
+	}
+
+	if c.eksPricing == nil {
+		return 0, false
+	}
+
+	if extendedSupport {
+		if c.eksPricing.ExtendedHourlyRate > 0 {
+			return c.eksPricing.ExtendedHourlyRate, true
+		}
+		return 0, false
+	}
+
+	if c.eksPricing.StandardHourlyRate > 0 {
+		return c.eksPricing.StandardHourlyRate, true
+	}
+	return 0, false
 }

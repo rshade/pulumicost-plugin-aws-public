@@ -1,0 +1,34 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "model": "opencode/grok-code",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "plan": {
+      "mode": "primary",
+      "model": "opencode/grok-code",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      }
+    },
+    "code-reviewer": {
+      "description": "Reviews code for best practices and potential issues",
+      "mode": "subagent",
+      "model": "opencode/claude-opus-4-5",
+      "prompt": "{file:./.opencode/command/code-review.md}",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": true
+      }
+    }
+  }
+}

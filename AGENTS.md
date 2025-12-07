@@ -37,6 +37,8 @@
 
 ## Active Technologies
 
+- Go 1.25.4 + gRPC, zerolog, embedded JSON pricing data (010-eks-cost-estimation)
+- Embedded JSON pricing data (no runtime storage) (010-eks-cost-estimation)
 - Go 1.25.4 + GoReleaser, gRPC, build tags (006-region-build-matrix)
 - Embedded JSON files in Go binaries (006-region-build-matrix)
 
@@ -74,3 +76,23 @@ Examples:
 ```
 
 Supported languages: Go, JavaScript/TypeScript, Python
+
+### speckit.research
+
+Specialized research agent for technical decision-making and technology evaluation.
+
+Usage:
+
+- Called by speckit.plan for research tasks
+- Can be invoked directly for specific research needs
+- Provides structured research findings with recommendations
+
+### speckit.code-review
+
+Automated code review agent integrated with speckit workflow.
+
+Usage:
+
+- Automatically called during speckit.implement for quality assurance
+- Can be invoked manually for code review needs
+- Provides detailed findings with severity levels and fix suggestions

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -8,8 +9,16 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
+// main is the program entry point that fetches and writes combined AWS pricing data for one or more regions.
+// 
+// It parses command-line flags to determine regions (`--regions`), output directory (`--out-dir`), and
+// services (`--service`). The deprecated `--dummy` flag is accepted but ignored. For each region, it calls
+// generateCombinedPricingData to fetch pricing for the requested services and write a combined JSON file;
+// on any per-region error the program prints the error to stderr and exits with status 1. On success it prints
+// per-region and final completion messages.
 func main() {
 	regions := flag.String("regions", "us-east-1", "Comma-separated regions")
 	outDir := flag.String("out-dir", "./data", "Output directory")
@@ -47,7 +56,21 @@ type awsPricing struct {
 	Terms           map[string]map[string]json.RawMessage `json:"terms"`
 }
 
-// generateCombinedPricingData fetches and combines pricing data from multiple AWS services
+// generateCombinedPricingData fetches pricing data for each service in services,
+// combines their Products and OnDemand Terms into a single awsPricing value, and
+// writes the combined pricing JSON to a file named aws_pricing_<region>.json in outDir.
+//
+// The function skips empty service entries. The combined data will use "Combined"
+// as the OfferCode and inherits Version and PublicationDate from the first
+// successfully fetched service.
+//
+// Parameters:
+//   - region: AWS region used to fetch service pricing.
+//   - services: slice of AWS service codes to fetch and combine.
+//   - outDir: directory where the resulting JSON file will be written.
+//
+// Returns an error if any service fetch fails, if the output directory or file
+// cannot be created, or if encoding the combined pricing to JSON fails.
 func generateCombinedPricingData(region string, services []string, outDir string) error {
 	// Combined pricing structure
 	combined := awsPricing{
@@ -114,6 +137,9 @@ func generateCombinedPricingData(region string, services []string, outDir string
 	return nil
 }
 
+// httpRequestTimeout is the timeout for HTTP requests to AWS pricing API
+const httpRequestTimeout = 5 * time.Minute
+
 // fetchServicePricing retrieves AWS pricing data for the specified service and region.
 // It requests the Pricing API index JSON for the given service and region and parses it into an awsPricing value.
 // region is the AWS region code (for example, "us-east-1").
@@ -122,7 +148,16 @@ func generateCombinedPricingData(region string, services []string, outDir string
 func fetchServicePricing(region, service string) (*awsPricing, error) {
 	url := fmt.Sprintf("https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/%s/current/%s/index.json", service, region)
 
-	resp, err := http.Get(url)
+	// Create request with context for timeout support
+	ctx, cancel := context.WithTimeout(context.Background(), httpRequestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL: %w", err)
 	}

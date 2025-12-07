@@ -51,6 +51,14 @@ var rawPricingJSON = []byte(`{
         "volumeApiName": "gp2",
         "regionCode": "unknown"
       }
+    },
+    "SKU_EKS_CLUSTER": {
+      "sku": "SKU_EKS_CLUSTER",
+      "productFamily": "Compute",
+      "attributes": {
+        "servicecode": "AmazonEKS",
+        "regionCode": "unknown"
+      }
     }
   },
   "terms": {
@@ -110,6 +118,21 @@ var rawPricingJSON = []byte(`{
               "rateCode": "SKU_GP2.JRTCKXETXF.6YS6EN2CT7",
               "description": "gp2 storage rate",
               "unit": "GB-Mo",
+              "pricePerUnit": { "USD": "0.10" }
+            }
+          }
+        }
+      },
+      "SKU_EKS_CLUSTER": {
+        "SKU_EKS_CLUSTER.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "SKU_EKS_CLUSTER",
+          "effectiveDate": "2024-01-01T00:00:00Z",
+          "priceDimensions": {
+            "SKU_EKS_CLUSTER.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "SKU_EKS_CLUSTER.JRTCKXETXF.6YS6EN2CT7",
+              "description": "EKS cluster hourly rate",
+              "unit": "Hrs",
               "pricePerUnit": { "USD": "0.10" }
             }
           }

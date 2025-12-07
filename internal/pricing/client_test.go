@@ -254,3 +254,49 @@ func TestClient_RegionSpecificPricing(t *testing.T) {
 		}
 	}
 }
+
+func TestClient_EKSClusterPricePerHour(t *testing.T) {
+	t.Log("Starting EKS test")
+	client, err := NewClient(zerolog.Nop())
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
+
+	t.Logf("Client region: %s", client.Region())
+
+	// Test standard support pricing
+	standardPrice, standardFound := client.EKSClusterPricePerHour(false)
+	t.Logf("EKS standard support price lookup: found=%v, price=%v", standardFound, standardPrice)
+
+	// Standard support pricing should be available for known regions
+	if !standardFound {
+		t.Errorf("EKSClusterPricePerHour(false) should return found=true for standard support, region=%s", client.Region())
+	} else {
+		// Verify standard price is reasonable (should be around $0.10/hour)
+		if standardPrice <= 0 {
+			t.Errorf("EKS standard price should be positive, got: %v", standardPrice)
+		}
+		if standardPrice > 0.20 {
+			t.Errorf("EKS standard price seems too high: %v (expected ~$0.10/hour)", standardPrice)
+		}
+		t.Logf("EKS cluster standard support hourly price = $%.4f", standardPrice)
+	}
+
+	// Test extended support pricing
+	extendedPrice, extendedFound := client.EKSClusterPricePerHour(true)
+	t.Logf("EKS extended support price lookup: found=%v, price=%v", extendedFound, extendedPrice)
+
+	// Extended support pricing may or may not be available depending on the pricing data
+	if extendedFound {
+		// Verify extended price is reasonable (should be around $0.50/hour)
+		if extendedPrice <= 0 {
+			t.Errorf("EKS extended price should be positive, got: %v", extendedPrice)
+		}
+		if extendedPrice < standardPrice {
+			t.Errorf("EKS extended price (%v) should be >= standard price (%v)", extendedPrice, standardPrice)
+		}
+		t.Logf("EKS cluster extended support hourly price = $%.4f", extendedPrice)
+	} else {
+		t.Logf("Extended support pricing not available for region %s (this may be expected)", client.Region())
+	}
+}

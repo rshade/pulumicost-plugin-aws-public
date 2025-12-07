@@ -379,3 +379,226 @@ func TestIntegration_TraceIDPropagation(t *testing.T) {
 
 	t.Log("Trace ID propagation integration test completed!")
 }
+
+// TestIntegration_EKS_UseEast1_Binary performs end-to-end testing of EKS cost estimation.
+//
+// This integration test validates:
+//   - EKS resource type support in Supports() RPC
+//   - EKS cost calculation in GetProjectedCost() RPC
+//   - Standard support pricing ($0.10/hour)
+//   - Extended support pricing via SKU ($0.50/hour)
+//   - Extended support pricing via tags
+//   - Proper billing details mentioning control plane only
+//
+// Test coverage (task reference: T009):
+//   - Validates EKS pricing data embedded correctly
+//   - Confirms monthly cost calculation (hourly × 730)
+//   - Verifies support type detection (standard vs extended)
+//   - Tests both SKU and tag-based extended support detection
+//
+// Production scenarios validated:
+//  1. Standard support (default): Common case for new clusters using default SKU
+//  2. Extended support via SKU: Explicitly requesting extended tier via resource SKU
+//  3. Extended support via tag: Infrastructure-as-code pattern using feature flags in tags
+//
+// Prerequisites:
+//   - Go toolchain available for building
+//   - us-east-1 binary with EKS pricing data
+//
+// Run with: go test -tags=integration ./internal/plugin/...
+func TestIntegration_EKS_UseEast1_Binary(t *testing.T) {
+	// Build the binary with region_use1 tag
+	t.Log("Building us-east-1 binary for EKS testing...")
+	buildCmd := exec.Command("go", "build",
+		"-tags", "region_use1",
+		"-o", "../../dist/test-pulumicost-plugin-aws-public-us-east-1",
+		"../../cmd/pulumicost-plugin-aws-public")
+	buildCmd.Dir, _ = os.Getwd()
+	output, err := buildCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to build binary: %v\nOutput: %s", err, string(output))
+	}
+
+	// Ensure cleanup
+	defer func() {
+		if err := os.Remove("../../dist/test-pulumicost-plugin-aws-public-us-east-1"); err != nil {
+			t.Logf("Warning: failed to cleanup test binary: %v", err)
+		}
+	}()
+
+	// Start the binary
+	t.Log("Starting us-east-1 binary...")
+	cmd := exec.Command("../../dist/test-pulumicost-plugin-aws-public-us-east-1")
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatalf("Failed to get stdout pipe: %v", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Failed to start binary: %v", err)
+	}
+
+	// Ensure cleanup
+	defer func() {
+		if err := cmd.Process.Kill(); err != nil {
+			t.Logf("Warning: failed to kill process: %v", err)
+		}
+	}()
+
+	// Read PORT announcement
+	portChan := make(chan string, 1)
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "PORT=") {
+				port := strings.TrimPrefix(line, "PORT=")
+				portChan <- port
+				break
+			}
+		}
+	}()
+
+	// Wait for port announcement with timeout
+	select {
+	case port := <-portChan:
+		t.Logf("Binary announced port: %s", port)
+
+		// Connect to gRPC server
+		conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			t.Fatalf("Failed to connect to gRPC server: %v", err)
+		}
+		defer func() {
+			if err := conn.Close(); err != nil {
+				t.Logf("Warning: failed to close connection: %v", err)
+			}
+		}()
+
+		client := pbc.NewCostSourceServiceClient(conn)
+
+		// Test 1: EKS Supports (standard support)
+		t.Run("EKS_Supports_Standard", func(t *testing.T) {
+			resp, err := client.Supports(context.Background(), &pbc.SupportsRequest{
+				Resource: &pbc.ResourceDescriptor{
+					Provider:     "aws",
+					ResourceType: "eks",
+					Sku:          "cluster",
+					Region:       "us-east-1",
+				},
+			})
+
+			if err != nil {
+				t.Fatalf("Supports() failed: %v", err)
+			}
+
+			if !resp.Supported {
+				t.Errorf("EKS should be supported, got supported=false, reason: %s", resp.Reason)
+			}
+		})
+
+		// Test 2: EKS GetProjectedCost (standard support)
+		t.Run("EKS_GetProjectedCost_Standard", func(t *testing.T) {
+			resp, err := client.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+				Resource: &pbc.ResourceDescriptor{
+					Provider:     "aws",
+					ResourceType: "eks",
+					Sku:          "cluster",
+					Region:       "us-east-1",
+				},
+			})
+
+			if err != nil {
+				t.Fatalf("GetProjectedCost() failed: %v", err)
+			}
+
+			// Verify cost calculation: 0.10 * 730 = 73.00
+			expectedCost := 0.10 * 730.0
+			if resp.CostPerMonth != expectedCost {
+				t.Errorf("CostPerMonth = %v, want %v", resp.CostPerMonth, expectedCost)
+			}
+
+			if resp.UnitPrice != 0.10 {
+				t.Errorf("UnitPrice = %v, want 0.10", resp.UnitPrice)
+			}
+
+			if resp.Currency != "USD" {
+				t.Errorf("Currency = %q, want %q", resp.Currency, "USD")
+			}
+
+			// Verify billing detail
+			expectedDetail := "EKS cluster (standard support), 730 hrs/month (control plane only, excludes worker nodes)"
+			if resp.BillingDetail != expectedDetail {
+				t.Errorf("BillingDetail = %q, want %q", resp.BillingDetail, expectedDetail)
+			}
+		})
+
+		// Test 3: EKS GetProjectedCost (extended support via SKU)
+		t.Run("EKS_GetProjectedCost_Extended_SKU", func(t *testing.T) {
+			resp, err := client.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+				Resource: &pbc.ResourceDescriptor{
+					Provider:     "aws",
+					ResourceType: "eks",
+					Sku:          "cluster-extended",
+					Region:       "us-east-1",
+				},
+			})
+
+			if err != nil {
+				t.Fatalf("GetProjectedCost() failed: %v", err)
+			}
+
+			// Verify cost calculation: 0.50 * 730 = 365.00
+			expectedCost := 0.50 * 730.0
+			if resp.CostPerMonth != expectedCost {
+				t.Errorf("CostPerMonth = %v, want %v", resp.CostPerMonth, expectedCost)
+			}
+
+			if resp.UnitPrice != 0.50 {
+				t.Errorf("UnitPrice = %v, want 0.50", resp.UnitPrice)
+			}
+
+			// Verify billing detail mentions extended support
+			expectedDetail := "EKS cluster (extended support), 730 hrs/month (control plane only, excludes worker nodes)"
+			if resp.BillingDetail != expectedDetail {
+				t.Errorf("BillingDetail = %q, want %q", resp.BillingDetail, expectedDetail)
+			}
+		})
+
+		// Test 4: EKS GetProjectedCost (extended support via tags)
+		t.Run("EKS_GetProjectedCost_Extended_Tags", func(t *testing.T) {
+			resp, err := client.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+				Resource: &pbc.ResourceDescriptor{
+					Provider:     "aws",
+					ResourceType: "eks",
+					Sku:          "cluster",
+					Region:       "us-east-1",
+					Tags: map[string]string{
+						"support_type": "extended",
+					},
+				},
+			})
+
+			if err != nil {
+				t.Fatalf("GetProjectedCost() failed: %v", err)
+			}
+
+			// Verify cost calculation: 0.50 * 730 = 365.00
+			expectedCost := 0.50 * 730.0
+			if resp.CostPerMonth != expectedCost {
+				t.Errorf("CostPerMonth = %v, want %v", resp.CostPerMonth, expectedCost)
+			}
+
+			// Verify billing detail mentions extended support
+			expectedDetail := "EKS cluster (extended support), 730 hrs/month (control plane only, excludes worker nodes)"
+			if resp.BillingDetail != expectedDetail {
+				t.Errorf("BillingDetail = %q, want %q", resp.BillingDetail, expectedDetail)
+			}
+		})
+
+	case <-time.After(portAnnouncementTimeout):
+		t.Fatal("Timeout waiting for PORT announcement")
+	}
+
+	t.Log("EKS integration test completed!")
+}

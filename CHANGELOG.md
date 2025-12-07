@@ -3,6 +3,10 @@
 ## [0.0.6](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.5...v0.0.6) (2025-12-06)
 
 
+### Features
+
+* **eks:** add EKS cluster cost estimation support ([#57](https://github.com/rshade/pulumicost-plugin-aws-public/issues/57))
+
 ### Bug Fixes
 
 * **release:** fix automated release workflow for GoReleaser v2 ([84fc43e](https://github.com/rshade/pulumicost-plugin-aws-public/commit/84fc43e7ed052237c14e04e286de5af6cc2c2140))
