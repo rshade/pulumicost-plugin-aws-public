@@ -58,6 +58,33 @@ func TestGetProjectedCost_EC2(t *testing.T) {
 	}
 }
 
+// TestGetProjectedCost_EC2_PulumiFormat tests EC2 cost estimation with Pulumi resource type format (T042)
+func TestGetProjectedCost_EC2_PulumiFormat(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	mock.ec2Prices["t3.micro/Linux/Shared"] = 0.0104
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	// Test with Pulumi format resource type
+	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{
+			Provider:     "aws",
+			ResourceType: "aws:ec2/instance:Instance", // Pulumi format
+			Sku:          "t3.micro",
+			Region:       "us-east-1",
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("GetProjectedCost() with Pulumi format failed: %v", err)
+	}
+
+	expectedCost := 0.0104 * 730.0
+	if resp.CostPerMonth != expectedCost {
+		t.Errorf("CostPerMonth = %v, want %v", resp.CostPerMonth, expectedCost)
+	}
+}
+
 // TestGetProjectedCost_EBS_WithSize tests EBS cost estimation with explicit size (T041)
 func TestGetProjectedCost_EBS_WithSize(t *testing.T) {
 	mock := newMockPricingClient("us-east-1", "USD")
@@ -1140,8 +1167,8 @@ func TestGetProjectedCost_RDS_UnknownInstance(t *testing.T) {
 // TestGetProjectedCost_RDS_AllEngines tests all supported database engines
 func TestGetProjectedCost_RDS_AllEngines(t *testing.T) {
 	tests := []struct {
-		name             string
-		engineTag        string
+		name               string
+		engineTag          string
 		expectedNormalized string
 	}{
 		{"MySQL", "mysql", "MySQL"},
@@ -1243,6 +1270,42 @@ func TestGetProjectedCost_RDS_InvalidStorageSize(t *testing.T) {
 			// Should mention defaulted
 			if !strings.Contains(resp.BillingDetail, "defaulted") {
 				t.Errorf("BillingDetail should mention defaulted, got: %s", resp.BillingDetail)
+			}
+		})
+	}
+}
+
+func TestDetectService(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		// Exact matches
+		{"simple ec2", "ec2", "ec2"},
+		{"pulumi ec2/instance format", "aws:ec2/instance:Instance", "ec2"},
+		{"pulumi ec2 format", "aws:ec2:Instance", "ec2"},
+		{"pulumi ebs/volume format", "aws:ebs/volume:Volume", "ebs"},
+		{"pulumi ec2/volume format", "aws:ec2/volume:Volume", "ebs"},
+
+		// Containment fallbacks
+		{"custom ec2/instance variant", "custom:ec2/instance:Something", "ec2"},
+		{"custom ebs/volume variant", "custom:ebs/volume:Something", "ebs"},
+
+		// Stub services
+		{"s3 bucket", "aws:s3/bucket:Bucket", "s3"},
+		{"lambda function", "aws:lambda/function:Function", "lambda"},
+
+		// Unsupported - should return input as-is
+		{"unsupported service", "aws:unknown:Service", "aws:unknown:Service"},
+		{"completely unknown", "foobar", "foobar"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := detectService(tt.input)
+			if got != tt.expected {
+				t.Errorf("detectService(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
 		})
 	}

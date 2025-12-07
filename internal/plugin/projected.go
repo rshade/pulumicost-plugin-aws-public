@@ -19,6 +19,25 @@ const (
 	defaultRDSEngine  = "mysql"
 	defaultRDSStorage = "gp2"
 	defaultRDSSizeGB  = 20
+
+	// Supported Resource Types (normalized to lowercase)
+	resTypeEC2InstanceLegacy = "aws:ec2:instance"
+	resTypeEC2Instance       = "aws:ec2/instance:instance"
+
+	resTypeEBSVolumeLegacy = "aws:ec2/volume:volume"
+	resTypeEBSVolume       = "aws:ebs/volume:volume"
+
+	resTypeRDSInstanceLegacy = "aws:rds:instance"
+	resTypeRDSInstance       = "aws:rds/instance:instance"
+
+	resTypeS3BucketLegacy = "aws:s3:bucket"
+	resTypeS3Bucket       = "aws:s3/bucket:bucket"
+
+	resTypeLambdaFunctionLegacy = "aws:lambda:function"
+	resTypeLambdaFunction       = "aws:lambda/function:function"
+
+	resTypeDynamoDBTableLegacy = "aws:dynamodb:table"
+	resTypeDynamoDBTable       = "aws:dynamodb/table:table"
 )
 
 // engineNormalization maps user-friendly engine names to AWS pricing API identifiers.
@@ -93,16 +112,28 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 
 		// Return error with details
 		st := status.New(codes.FailedPrecondition, errDetail.Message)
-		st, _ = st.WithDetails(errDetail)
-		p.logErrorWithID(traceID, "GetProjectedCost", st.Err(), pbc.ErrorCode_ERROR_CODE_UNSUPPORTED_REGION)
-		return nil, st.Err()
+		stWithDetails, err := st.WithDetails(errDetail)
+		if err != nil {
+			p.logger.Warn().
+				Str(pluginsdk.FieldTraceID, traceID).
+				Str("grpc_code", codes.FailedPrecondition.String()).
+				Str("message", errDetail.Message).
+				Str("error_code", pbc.ErrorCode_ERROR_CODE_UNSUPPORTED_REGION.String()).
+				Err(err). // Log the error returned by WithDetails
+				Msg("failed to attach error details to gRPC status for region mismatch")
+			p.logErrorWithID(traceID, "GetProjectedCost", st.Err(), pbc.ErrorCode_ERROR_CODE_UNSUPPORTED_REGION)
+			return nil, st.Err() // Return original status without details
+		}
+		p.logErrorWithID(traceID, "GetProjectedCost", stWithDetails.Err(), pbc.ErrorCode_ERROR_CODE_UNSUPPORTED_REGION)
+		return nil, stWithDetails.Err()
 	}
 
 	// Route to appropriate estimator based on resource type
 	var resp *pbc.GetProjectedCostResponse
 	var err error
 
-	switch resource.ResourceType {
+	serviceType := detectService(resource.ResourceType)
+	switch serviceType {
 	case "ec2":
 		resp, err = p.estimateEC2(traceID, resource)
 	case "ebs":
@@ -438,4 +469,53 @@ func (p *AWSPublicPlugin) estimateRDS(traceID string, resource *pbc.ResourceDesc
 		Currency:      "USD",
 		BillingDetail: billingDetail,
 	}, nil
+}
+
+// detectService maps Pulumi resource types to supported service identifiers.
+//
+// This function handles multiple input formats:
+//   - Simple identifiers: "ec2", "ebs", "rds"
+//   - Pulumi formats: "aws:ec2/instance:Instance", "aws:ebs/volume:Volume"
+//   - Legacy formats: "aws:ec2:Instance"
+//
+// If no match is found, the input is returned as-is for backward compatibility.
+//
+// Examples:
+//
+//	detectService("ec2")                        -> "ec2"
+//	detectService("aws:ec2/instance:Instance")  -> "ec2"
+//	detectService("aws:ebs/volume:Volume")      -> "ebs"
+// detectService maps a provider resource type string to a normalized service identifier.
+// It returns one of "ec2", "ebs", "rds", "s3", "lambda", or "dynamodb" when a known mapping or pattern is found;
+// otherwise it returns the original resourceType unchanged.
+func detectService(resourceType string) string {
+	resourceTypeLower := strings.ToLower(resourceType)
+
+	switch resourceTypeLower {
+	case "ec2", resTypeEC2Instance, resTypeEC2InstanceLegacy:
+		return "ec2"
+	case "ebs", resTypeEBSVolume, resTypeEBSVolumeLegacy:
+		return "ebs"
+	case "rds", resTypeRDSInstance, resTypeRDSInstanceLegacy:
+		return "rds"
+	case "s3", resTypeS3Bucket, resTypeS3BucketLegacy:
+		return "s3"
+	case "lambda", resTypeLambdaFunction, resTypeLambdaFunctionLegacy:
+		return "lambda"
+	case "dynamodb", resTypeDynamoDBTable, resTypeDynamoDBTableLegacy:
+		return "dynamodb"
+	}
+
+	// Fallback: simple containment check for common patterns
+	if strings.Contains(resourceTypeLower, "ec2/instance") {
+		return "ec2"
+	}
+	if strings.Contains(resourceTypeLower, "ebs/volume") || strings.Contains(resourceTypeLower, "ec2/volume") {
+		return "ebs"
+	}
+	if strings.Contains(resourceTypeLower, "rds/instance") {
+		return "rds"
+	}
+
+	return resourceType
 }

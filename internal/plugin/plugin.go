@@ -49,9 +49,9 @@ func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logg
 // See research.md U1 Remediation for details.
 //
 // Extraction order:
-//   1. SDK helper (if interceptor registered)
-//   2. Direct gRPC metadata lookup
-//   3. UUID generation (FR-003 fallback)
+//  1. SDK helper (if interceptor registered)
+//  2. Direct gRPC metadata lookup
+//  3. UUID generation (FR-003 fallback)
 //
 // Returns a non-empty trace_id string suitable for log correlation.
 func (p *AWSPublicPlugin) getTraceID(ctx context.Context) string {
@@ -117,8 +117,19 @@ func (p *AWSPublicPlugin) newErrorWithID(traceID string, grpcCode codes.Code, ms
 	}
 
 	st := status.New(grpcCode, msg)
-	st, _ = st.WithDetails(errDetail)
-	return st.Err()
+	stWithDetails, err := st.WithDetails(errDetail)
+	if err != nil {
+		// Log a warning if details could not be attached
+		p.logger.Warn().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str("grpc_code", grpcCode.String()).
+			Str("message", msg).
+			Str("error_code", errorCode.String()).
+			Err(err). // Log the error returned by WithDetails
+			Msg("failed to attach error details to gRPC status")
+		return st.Err() // Return original status without details
+	}
+	return stWithDetails.Err()
 }
 
 // Name returns the plugin name identifier.

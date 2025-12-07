@@ -299,9 +299,9 @@ func TestGetPricingSpec_MissingFields(t *testing.T) {
 // TestGetPricingSpec_AllVolumeTypes verifies EBS pricing for different volume types.
 func TestGetPricingSpec_AllVolumeTypes(t *testing.T) {
 	volumeTypes := []struct {
-		name        string
-		volumeType  string
-		pricePerGB  float64
+		name       string
+		volumeType string
+		pricePerGB float64
 	}{
 		{"gp3", "gp3", 0.08},
 		{"gp2", "gp2", 0.10},
