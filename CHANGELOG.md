@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.9](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.8...v0.0.9) (2025-12-08)
+
+
+### Features
+
+* **s3:** implement S3 storage cost estimation ([#99](https://github.com/rshade/pulumicost-plugin-aws-public/issues/99)) ([06167dc](https://github.com/rshade/pulumicost-plugin-aws-public/commit/06167dc150c5119ecb18d08b1b546a482e9ecfee))
+
+
+### Bug Fixes
+
+* **resource:** Support Pulumi resource type format ([#97](https://github.com/rshade/pulumicost-plugin-aws-public/issues/97)) ([2fb4008](https://github.com/rshade/pulumicost-plugin-aws-public/commit/2fb4008af3908522654171939eabd02e4a796562)), closes [#82](https://github.com/rshade/pulumicost-plugin-aws-public/issues/82)
+
 ## [0.0.8](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.7...v0.0.8) (2025-12-07)
 
 
