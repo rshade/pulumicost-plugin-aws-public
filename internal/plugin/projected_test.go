@@ -1529,3 +1529,165 @@ func TestGetProjectedCost_EKS_SupportTypeCaseInsensitive(t *testing.T) {
 		})
 	}
 }
+
+// TestEstimateLambda_ValidInput tests Lambda cost estimation with valid inputs
+func TestEstimateLambda_ValidInput(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	mock.lambdaRequestPrice = 0.0000002     // $0.20 per million requests
+	mock.lambdaGBSecondPrice = 0.0000166667 // $0.0000166667 per GB-second
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	// Test case: 512MB memory, 1M requests, 200ms duration
+	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{
+			Provider:     "aws",
+			ResourceType: "lambda",
+			Sku:          "512",
+			Region:       "us-east-1",
+			Tags: map[string]string{
+				"requests_per_month": "1000000",
+				"avg_duration_ms":    "200",
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("GetProjectedCost() returned error: %v", err)
+	}
+
+	// Verify cost calculation:
+	// GB-seconds = (512/1024) * (200/1000) * 1,000,000 = 100,000
+	// Request cost = 1,000,000 * $0.0000002 = $0.20
+	// Duration cost = 100,000 * $0.0000166667 = $1.66667
+	// Total = $1.86667
+	expectedGBSeconds := (512.0 / 1024.0) * (200.0 / 1000.0) * 1000000.0 // 100,000
+	expectedRequestCost := 1000000.0 * 0.0000002                         // $0.20
+	expectedDurationCost := expectedGBSeconds * 0.0000166667             // $1.66667
+	expectedTotal := expectedRequestCost + expectedDurationCost          // $1.86667
+
+	if resp.CostPerMonth < expectedTotal-0.01 || resp.CostPerMonth > expectedTotal+0.01 {
+		t.Errorf("CostPerMonth = %v, want approximately %v", resp.CostPerMonth, expectedTotal)
+	}
+
+	if resp.UnitPrice != 0.0000166667 {
+		t.Errorf("UnitPrice = %v, want 0.0000166667", resp.UnitPrice)
+	}
+
+	if resp.Currency != "USD" {
+		t.Errorf("Currency = %v, want USD", resp.Currency)
+	}
+
+	if !strings.Contains(resp.BillingDetail, "Lambda 512MB") {
+		t.Errorf("BillingDetail should contain memory info, got: %s", resp.BillingDetail)
+	}
+}
+
+// TestEstimateLambda_MissingRequestCount tests Lambda cost estimation with missing request count
+func TestEstimateLambda_MissingRequestCount(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	mock.lambdaRequestPrice = 0.0000002
+	mock.lambdaGBSecondPrice = 0.0000166667
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{
+			Provider:     "aws",
+			ResourceType: "lambda",
+			Sku:          "512",
+			Region:       "us-east-1",
+			Tags: map[string]string{
+				"avg_duration_ms": "200", // Missing requests_per_month
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("GetProjectedCost() returned error: %v", err)
+	}
+
+	// Should return $0 cost with explanatory billing detail
+	if resp.CostPerMonth != 0.0 {
+		t.Errorf("CostPerMonth = %v, want 0.0 for missing request count", resp.CostPerMonth)
+	}
+
+	if !strings.Contains(resp.BillingDetail, "Missing required tag") {
+		t.Errorf("BillingDetail should explain missing tag, got: %s", resp.BillingDetail)
+	}
+}
+
+// TestEstimateLambda_MissingDuration tests Lambda cost estimation with missing duration
+func TestEstimateLambda_MissingDuration(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	mock.lambdaRequestPrice = 0.0000002
+	mock.lambdaGBSecondPrice = 0.0000166667
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{
+			Provider:     "aws",
+			ResourceType: "lambda",
+			Sku:          "512",
+			Region:       "us-east-1",
+			Tags: map[string]string{
+				"requests_per_month": "1000000", // Missing avg_duration_ms
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("GetProjectedCost() returned error: %v", err)
+	}
+
+	// Should return $0 cost with explanatory billing detail
+	if resp.CostPerMonth != 0.0 {
+		t.Errorf("CostPerMonth = %v, want 0.0 for missing duration", resp.CostPerMonth)
+	}
+
+	if !strings.Contains(resp.BillingDetail, "Missing required tag") {
+		t.Errorf("BillingDetail should explain missing tag, got: %s", resp.BillingDetail)
+	}
+}
+
+// TestEstimateLambda_InvalidMemorySize tests Lambda cost estimation with invalid memory size
+func TestEstimateLambda_InvalidMemorySize(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	mock.lambdaRequestPrice = 0.0000002
+	mock.lambdaGBSecondPrice = 0.0000166667
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	resp, err := plugin.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{
+			Provider:     "aws",
+			ResourceType: "lambda",
+			Sku:          "invalid", // Invalid memory size
+			Region:       "us-east-1",
+			Tags: map[string]string{
+				"requests_per_month": "1000000",
+				"avg_duration_ms":    "200",
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("GetProjectedCost() returned error: %v", err)
+	}
+
+	// Should default to 128MB and calculate accordingly
+	// GB-seconds = (128/1024) * (200/1000) * 1,000,000 = 25,000
+	// Request cost = 1,000,000 * $0.0000002 = $0.20
+	// Duration cost = 25,000 * $0.0000166667 = $0.416667
+	// Total = $0.616667
+	expectedTotal := 1000000.0*0.0000002 + 25000.0*0.0000166667
+
+	if resp.CostPerMonth < expectedTotal-0.01 || resp.CostPerMonth > expectedTotal+0.01 {
+		t.Errorf("CostPerMonth = %v, want approximately %v", resp.CostPerMonth, expectedTotal)
+	}
+
+	if !strings.Contains(resp.BillingDetail, "Lambda 128MB") {
+		t.Errorf("BillingDetail should show default 128MB, got: %s", resp.BillingDetail)
+	}
+}

@@ -145,7 +145,11 @@ func (p *AWSPublicPlugin) GetProjectedCost(ctx context.Context, req *pbc.GetProj
 		resp, err = p.estimateRDS(traceID, resource)
 	case "eks":
 		resp, err = p.estimateEKS(traceID, resource)
-	case "s3", "lambda", "dynamodb":
+	case "s3":
+		resp, err = p.estimateS3(traceID, resource)
+	case "lambda":
+		resp, err = p.estimateLambda(traceID, resource)
+	case "dynamodb":
 		resp, err = p.estimateStub(resource)
 	default:
 		// Unknown resource type - return $0 with explanation
@@ -330,6 +334,72 @@ func (p *AWSPublicPlugin) estimateEBS(traceID string, resource *pbc.ResourceDesc
 	}
 
 	// FR-022, FR-023, FR-024: Return response
+	return &pbc.GetProjectedCostResponse{
+		CostPerMonth:  costPerMonth,
+		UnitPrice:     ratePerGBMonth,
+		Currency:      "USD",
+		BillingDetail: billingDetail,
+	}, nil
+}
+
+// estimateS3 calculates projected monthly cost for S3 storage.
+func (p *AWSPublicPlugin) estimateS3(traceID string, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
+	storageClass := resource.Sku
+
+	// Extract size from tags, default to 1GB
+	sizeGB := 1.0
+	sizeAssumed := true
+
+	if resource.Tags != nil {
+		if sizeStr, ok := resource.Tags["size"]; ok {
+			if size, err := strconv.ParseFloat(sizeStr, 64); err == nil && size > 0 {
+				sizeGB = size
+				sizeAssumed = false
+			}
+		}
+	}
+
+	// Lookup pricing using embedded data
+	ratePerGBMonth, found := p.pricing.S3PricePerGBMonth(storageClass)
+	if !found {
+		// Unknown storage class - return $0 with explanation
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "GetProjectedCost").
+			Str("storage_class", storageClass).
+			Str("aws_region", p.region).
+			Str("pricing_source", "embedded").
+			Msg("S3 storage class not found in pricing data")
+
+		return &pbc.GetProjectedCostResponse{
+			CostPerMonth:  0,
+			UnitPrice:     0,
+			Currency:      "USD",
+			BillingDetail: fmt.Sprintf("S3 storage class %q not found in pricing data", storageClass),
+		}, nil
+	}
+
+	// Debug log successful lookup
+	p.logger.Debug().
+		Str(pluginsdk.FieldTraceID, traceID).
+		Str(pluginsdk.FieldOperation, "GetProjectedCost").
+		Str("storage_class", storageClass).
+		Str("aws_region", p.region).
+		Str("pricing_source", "embedded").
+		Float64("unit_price", ratePerGBMonth).
+		Msg("S3 pricing lookup successful")
+
+	// Calculate monthly cost
+	costPerMonth := ratePerGBMonth * sizeGB
+
+	// Include assumption in billing_detail if size was defaulted
+	var billingDetail string
+	if sizeAssumed {
+		billingDetail = fmt.Sprintf("S3 %s storage, %.0f GB (defaulted), $%.4f/GB-month", storageClass, sizeGB, ratePerGBMonth)
+	} else {
+		billingDetail = fmt.Sprintf("S3 %s storage, %.0f GB, $%.4f/GB-month", storageClass, sizeGB, ratePerGBMonth)
+	}
+
 	return &pbc.GetProjectedCostResponse{
 		CostPerMonth:  costPerMonth,
 		UnitPrice:     ratePerGBMonth,
@@ -567,5 +637,130 @@ func (p *AWSPublicPlugin) estimateEKS(traceID string, resource *pbc.ResourceDesc
 		UnitPrice:     hourlyRate,
 		Currency:      "USD",
 		BillingDetail: fmt.Sprintf("EKS cluster (%s), 730 hrs/month (control plane only, excludes worker nodes)", supportType),
+	}, nil
+}
+
+// estimateLambda calculates projected monthly cost for Lambda functions.
+// Uses request count and GB-seconds from resource tags.
+func (p *AWSPublicPlugin) estimateLambda(traceID string, resource *pbc.ResourceDescriptor) (*pbc.GetProjectedCostResponse, error) {
+	// Extract memory size from resource.Sku (default 128MB if missing or invalid)
+	memoryMB := 128.0 // default
+	if resource.Sku != "" {
+		if parsed, err := strconv.ParseFloat(resource.Sku, 64); err == nil && parsed > 0 {
+			memoryMB = parsed
+		} else {
+			p.logger.Debug().
+				Str(pluginsdk.FieldTraceID, traceID).
+				Str(pluginsdk.FieldOperation, "GetProjectedCost").
+				Str("sku", resource.Sku).
+				Msg("Invalid memory size in sku, using default 128MB")
+		}
+	}
+
+	// Extract request count from tags["requests_per_month"] (required)
+	requestCountStr := ""
+	if resource.Tags != nil {
+		requestCountStr = resource.Tags["requests_per_month"]
+	}
+	if requestCountStr == "" {
+		return &pbc.GetProjectedCostResponse{
+			CostPerMonth:  0,
+			UnitPrice:     0,
+			Currency:      "USD",
+			BillingDetail: "Missing required tag: requests_per_month",
+		}, nil
+	}
+
+	requestCount, err := strconv.ParseFloat(requestCountStr, 64)
+	if err != nil || requestCount < 0 {
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "GetProjectedCost").
+			Str("requests_per_month", requestCountStr).
+			Msg("Invalid request count, returning $0 cost")
+		return &pbc.GetProjectedCostResponse{
+			CostPerMonth:  0,
+			UnitPrice:     0,
+			Currency:      "USD",
+			BillingDetail: fmt.Sprintf("Invalid request count: %s", requestCountStr),
+		}, nil
+	}
+
+	// Extract duration from tags["avg_duration_ms"] (required)
+	durationStr := ""
+	if resource.Tags != nil {
+		durationStr = resource.Tags["avg_duration_ms"]
+	}
+	if durationStr == "" {
+		return &pbc.GetProjectedCostResponse{
+			CostPerMonth:  0,
+			UnitPrice:     0,
+			Currency:      "USD",
+			BillingDetail: "Missing required tag: avg_duration_ms",
+		}, nil
+	}
+
+	durationMS, err := strconv.ParseFloat(durationStr, 64)
+	if err != nil || durationMS < 0 {
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "GetProjectedCost").
+			Str("avg_duration_ms", durationStr).
+			Msg("Invalid duration, returning $0 cost")
+		return &pbc.GetProjectedCostResponse{
+			CostPerMonth:  0,
+			UnitPrice:     0,
+			Currency:      "USD",
+			BillingDetail: fmt.Sprintf("Invalid duration: %s", durationStr),
+		}, nil
+	}
+
+	// Look up Lambda pricing
+	requestPrice, foundRequest := p.pricing.LambdaPricePerRequest()
+	gbSecondPrice, foundDuration := p.pricing.LambdaPricePerGBSecond()
+
+	if !foundRequest || !foundDuration {
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "GetProjectedCost").
+			Str("aws_region", p.region).
+			Msg("Lambda pricing data not found")
+
+		return &pbc.GetProjectedCostResponse{
+			CostPerMonth:  0,
+			UnitPrice:     0,
+			Currency:      "USD",
+			BillingDetail: "Lambda pricing data not available for this region",
+		}, nil
+	}
+
+	// Calculate GB-seconds: (memoryGB * durationSeconds * requestCount)
+	memoryGB := memoryMB / 1024.0
+	durationSeconds := durationMS / 1000.0
+	gbSeconds := memoryGB * durationSeconds * requestCount
+
+	// Calculate costs
+	requestCost := requestCount * requestPrice
+	durationCost := gbSeconds * gbSecondPrice
+	totalCost := requestCost + durationCost
+
+	// Debug log successful calculation
+	p.logger.Debug().
+		Str(pluginsdk.FieldTraceID, traceID).
+		Str(pluginsdk.FieldOperation, "GetProjectedCost").
+		Int("memory_mb", int(memoryMB)).
+		Int64("requests", int64(requestCount)).
+		Int("duration_ms", int(durationMS)).
+		Float64("gb_seconds", gbSeconds).
+		Str("aws_region", p.region).
+		Msg("Lambda pricing lookup successful")
+
+	// Format billing detail
+	return &pbc.GetProjectedCostResponse{
+		CostPerMonth: totalCost,
+		UnitPrice:    gbSecondPrice, // Primary unit is GB-seconds
+		Currency:     "USD",
+		BillingDetail: fmt.Sprintf("Lambda %.0fMB, %.0f requests/month, %.0fms avg duration, %.0f GB-seconds",
+			memoryMB, requestCount, durationMS, gbSeconds),
 	}, nil
 }

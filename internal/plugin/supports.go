@@ -69,7 +69,7 @@ func (p *AWSPublicPlugin) Supports(ctx context.Context, req *pbc.SupportsRequest
 
 	// Check resource type
 	switch normalizedType {
-	case "ec2", "ebs", "rds", "eks":
+	case "ec2", "ebs", "rds", "eks", "s3":
 		// Fully supported
 		p.logger.Info().
 			Str(pluginsdk.FieldTraceID, traceID).
@@ -85,7 +85,22 @@ func (p *AWSPublicPlugin) Supports(ctx context.Context, req *pbc.SupportsRequest
 			Reason:    "",
 		}, nil
 
-	case "s3", "lambda", "dynamodb":
+	case "lambda":
+		// Full support - accurate cost estimates
+		p.logger.Info().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "Supports").
+			Str(pluginsdk.FieldResourceType, resource.ResourceType).
+			Str("aws_region", resource.Region).
+			Bool("supported", true).
+			Int64(pluginsdk.FieldDurationMs, time.Since(start).Milliseconds()).
+			Msg("resource support check")
+
+		return &pbc.SupportsResponse{
+			Supported: true,
+		}, nil
+
+	case "dynamodb":
 		// Stub support - returns $0 estimates
 		p.logger.Info().
 			Str(pluginsdk.FieldTraceID, traceID).

@@ -23,15 +23,21 @@ type mockPricingClient struct {
 	currency              string
 	ec2Prices             map[string]float64 // key: "instanceType/os/tenancy"
 	ebsPrices             map[string]float64 // key: "volumeType"
+	s3Prices              map[string]float64 // key: "storageClass"
 	rdsInstancePrices     map[string]float64 // key: "instanceType/engine"
 	rdsStoragePrices      map[string]float64 // key: "volumeType"
 	eksStandardPrice      float64            // EKS cluster standard support hourly rate
 	eksExtendedPrice      float64            // EKS cluster extended support hourly rate
+	lambdaRequestPrice    float64            // Lambda request pricing ($/request)
+	lambdaGBSecondPrice   float64            // Lambda duration pricing ($/GB-second)
 	ec2OnDemandCalled     int
 	ebsPriceCalled        int
+	s3PriceCalled         int
 	rdsOnDemandCalled     int
 	rdsStoragePriceCalled int
 	eksPriceCalled        int
+	lambdaRequestCalled   int
+	lambdaGBSecondCalled  int
 }
 
 // newMockPricingClient creates a new mockPricingClient with default values.
@@ -41,6 +47,7 @@ func newMockPricingClient(region, currency string) *mockPricingClient {
 		currency:          currency,
 		ec2Prices:         make(map[string]float64),
 		ebsPrices:         make(map[string]float64),
+		s3Prices:          make(map[string]float64),
 		rdsInstancePrices: make(map[string]float64),
 		rdsStoragePrices:  make(map[string]float64),
 	}
@@ -67,6 +74,12 @@ func (m *mockPricingClient) EBSPricePerGBMonth(volumeType string) (float64, bool
 	return price, found
 }
 
+func (m *mockPricingClient) S3PricePerGBMonth(storageClass string) (float64, bool) {
+	m.s3PriceCalled++
+	price, found := m.s3Prices[storageClass]
+	return price, found
+}
+
 func (m *mockPricingClient) RDSOnDemandPricePerHour(instanceType, engine string) (float64, bool) {
 	m.rdsOnDemandCalled++
 	key := instanceType + "/" + engine
@@ -90,6 +103,22 @@ func (m *mockPricingClient) EKSClusterPricePerHour(extendedSupport bool) (float6
 	}
 	if m.eksStandardPrice > 0 {
 		return m.eksStandardPrice, true
+	}
+	return 0, false
+}
+
+func (m *mockPricingClient) LambdaPricePerRequest() (float64, bool) {
+	m.lambdaRequestCalled++
+	if m.lambdaRequestPrice > 0 {
+		return m.lambdaRequestPrice, true
+	}
+	return 0, false
+}
+
+func (m *mockPricingClient) LambdaPricePerGBSecond() (float64, bool) {
+	m.lambdaGBSecondCalled++
+	if m.lambdaGBSecondPrice > 0 {
+		return m.lambdaGBSecondPrice, true
 	}
 	return 0, false
 }

@@ -17,6 +17,7 @@ type mockPricingClientActual struct {
 	region            string
 	ec2Prices         map[string]float64
 	ebsPrices         map[string]float64
+	s3Prices          map[string]float64
 	rdsInstancePrices map[string]float64
 	rdsStoragePrices  map[string]float64
 }
@@ -36,6 +37,11 @@ func (m *mockPricingClientActual) EC2OnDemandPricePerHour(instanceType, _, _ str
 
 func (m *mockPricingClientActual) EBSPricePerGBMonth(volumeType string) (float64, bool) {
 	price, ok := m.ebsPrices[volumeType]
+	return price, ok
+}
+
+func (m *mockPricingClientActual) S3PricePerGBMonth(storageClass string) (float64, bool) {
+	price, ok := m.s3Prices[storageClass]
 	return price, ok
 }
 
@@ -61,6 +67,14 @@ func (m *mockPricingClientActual) EKSClusterPricePerHour(extendedSupport bool) (
 		return 0.50, true // Extended EKS rate
 	}
 	return 0.10, true // Standard EKS rate
+}
+
+func (m *mockPricingClientActual) LambdaPricePerRequest() (float64, bool) {
+	return 0.0000002, true // $0.20 per million requests
+}
+
+func (m *mockPricingClientActual) LambdaPricePerGBSecond() (float64, bool) {
+	return 0.0000166667, true // $0.0000166667 per GB-second
 }
 
 func newTestPluginForActual() *AWSPublicPlugin {

@@ -27,6 +27,10 @@ type PricingClient interface {
 	// Returns (price, true) if found, (0, false) if not found
 	EBSPricePerGBMonth(volumeType string) (float64, bool)
 
+	// S3PricePerGBMonth returns monthly rate per GB for S3 storage
+	// Returns (price, true) if found, (0, false) if not found
+	S3PricePerGBMonth(storageClass string) (float64, bool)
+
 	// RDSOnDemandPricePerHour returns hourly rate for an RDS instance
 	// instanceType: e.g., "db.t3.medium"
 	// engine: normalized engine name, e.g., "MySQL", "PostgreSQL"
@@ -42,6 +46,14 @@ type PricingClient interface {
 	// extendedSupport: true for extended support pricing, false for standard support.
 	// Returns (price, true) if found, (0, false) if not found.
 	EKSClusterPricePerHour(extendedSupport bool) (float64, bool)
+
+	// LambdaPricePerRequest returns price per request for Lambda functions
+	// Returns (price, true) if found, (0, false) if not found
+	LambdaPricePerRequest() (float64, bool)
+
+	// LambdaPricePerGBSecond returns price per GB-second for Lambda functions
+	// Returns (price, true) if found, (0, false) if not found
+	LambdaPricePerGBSecond() (float64, bool)
 }
 
 // Client implements PricingClient with embedded JSON data
@@ -57,6 +69,7 @@ type Client struct {
 	// In-memory pricing indexes (built on first access)
 	ec2Index map[string]ec2Price
 	ebsIndex map[string]ebsPrice
+	s3Index  map[string]s3Price
 
 	// RDS pricing indexes (key: "instanceType/engine" for instances, "volumeType" for storage)
 	rdsInstanceIndex map[string]rdsInstancePrice
@@ -64,6 +77,9 @@ type Client struct {
 
 	// EKS pricing (single cluster rate)
 	eksPricing *eksPrice
+
+	// Lambda pricing (request and duration rates)
+	lambdaPricing *lambdaPrice
 }
 
 // NewClient creates a Client from embedded rawPricingJSON.
@@ -101,6 +117,7 @@ func (c *Client) init() error {
 		// 3. Build Lookup Indexes
 		c.ec2Index = make(map[string]ec2Price)
 		c.ebsIndex = make(map[string]ebsPrice)
+		c.s3Index = make(map[string]s3Price)
 		c.rdsInstanceIndex = make(map[string]rdsInstancePrice)
 		c.rdsStorageIndex = make(map[string]rdsStoragePrice)
 
@@ -191,6 +208,25 @@ func (c *Client) init() error {
 							RatePerGBMonth: rate,
 							Currency:       "USD",
 						}
+					}
+				}
+			}
+
+			// --- S3 Storage ---
+			// S3 uses productFamily="Storage" and servicecode="AmazonS3"
+			// Index by storageClass (e.g., "Standard", "Standard - Infrequent Access")
+			if prod.ProductFamily == "Storage" && attrs["servicecode"] == "AmazonS3" {
+				storageClass := attrs["storageClass"]
+				if storageClass == "" {
+					continue
+				}
+
+				rate, unit, found := getOnDemandPrice(sku)
+				if found && unit == "GB-Mo" {
+					c.s3Index[storageClass] = s3Price{
+						Unit:           unit,
+						RatePerGBMonth: rate,
+						Currency:       "USD",
 					}
 				}
 			}
@@ -298,6 +334,34 @@ func (c *Client) init() error {
 					}
 				}
 			}
+
+			// --- Lambda Functions ---
+			// Lambda uses servicecode="AWSLambda" with two pricing dimensions:
+			// - Requests: unit="Requests" or similar
+			// - Duration: unit="Second" or "Lambda-GB-Second"
+			if attrs["servicecode"] == "AWSLambda" || prod.ProductFamily == "Serverless" {
+				usageType := attrs["usagetype"]
+				group := attrs["group"]
+
+				// Initialize lambdaPrice struct if nil
+				if c.lambdaPricing == nil {
+					c.lambdaPricing = &lambdaPrice{
+						Currency: "USD",
+					}
+				}
+
+				rate, unit, found := getOnDemandPrice(sku)
+				if found && rate > 0 {
+					// Lambda request pricing: group="AWS-Lambda-Requests" or usagetype contains "Request"
+					if group == "AWS-Lambda-Requests" || strings.Contains(usageType, "Request") {
+						c.lambdaPricing.RequestPrice = rate
+					}
+					// Lambda duration pricing: group="AWS-Lambda-Duration" or unit contains "Second"
+					if group == "AWS-Lambda-Duration" || unit == "Second" || unit == "Lambda-GB-Second" {
+						c.lambdaPricing.GBSecondPrice = rate
+					}
+				}
+			}
 		}
 
 		// Validate EKS pricing data was loaded successfully
@@ -310,6 +374,18 @@ func (c *Client) init() error {
 			c.logger.Warn().
 				Str("region", c.region).
 				Msg("EKS extended support pricing not found in embedded data")
+		}
+
+		// Validate Lambda pricing data was loaded successfully
+		if c.lambdaPricing == nil || c.lambdaPricing.RequestPrice == 0 {
+			c.logger.Warn().
+				Str("region", c.region).
+				Msg("Lambda request pricing not found in embedded data")
+		}
+		if c.lambdaPricing != nil && c.lambdaPricing.GBSecondPrice == 0 {
+			c.logger.Warn().
+				Str("region", c.region).
+				Msg("Lambda duration pricing not found in embedded data")
 		}
 	})
 	return c.err
@@ -374,6 +450,31 @@ func (c *Client) EBSPricePerGBMonth(volumeType string) (float64, bool) {
 	}
 
 	price, found := c.ebsIndex[volumeType]
+	if !found {
+		return 0, false
+	}
+	return price.RatePerGBMonth, true
+}
+
+// S3PricePerGBMonth returns monthly rate per GB for S3 storage
+func (c *Client) S3PricePerGBMonth(storageClass string) (float64, bool) {
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		if elapsed > 50*time.Millisecond {
+			c.logger.Warn().
+				Str("resource_type", "S3").
+				Str("storage_class", storageClass).
+				Dur("elapsed", elapsed).
+				Msg("pricing lookup took too long")
+		}
+	}()
+
+	if err := c.init(); err != nil {
+		return 0, false
+	}
+
+	price, found := c.s3Index[storageClass]
 	if !found {
 		return 0, false
 	}
@@ -469,4 +570,54 @@ func (c *Client) EKSClusterPricePerHour(extendedSupport bool) (float64, bool) {
 		return c.eksPricing.StandardHourlyRate, true
 	}
 	return 0, false
+}
+
+// LambdaPricePerRequest returns price per request for Lambda functions
+func (c *Client) LambdaPricePerRequest() (float64, bool) {
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		if elapsed > 50*time.Millisecond {
+			c.logger.Warn().
+				Str("resource_type", "Lambda").
+				Str("pricing_type", "request").
+				Dur("elapsed", elapsed).
+				Msg("pricing lookup took too long")
+		}
+	}()
+
+	if err := c.init(); err != nil {
+		return 0, false
+	}
+
+	if c.lambdaPricing == nil || c.lambdaPricing.RequestPrice == 0 {
+		return 0, false
+	}
+
+	return c.lambdaPricing.RequestPrice, true
+}
+
+// LambdaPricePerGBSecond returns price per GB-second for Lambda functions
+func (c *Client) LambdaPricePerGBSecond() (float64, bool) {
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		if elapsed > 50*time.Millisecond {
+			c.logger.Warn().
+				Str("resource_type", "Lambda").
+				Str("pricing_type", "duration").
+				Dur("elapsed", elapsed).
+				Msg("pricing lookup took too long")
+		}
+	}()
+
+	if err := c.init(); err != nil {
+		return 0, false
+	}
+
+	if c.lambdaPricing == nil || c.lambdaPricing.GBSecondPrice == 0 {
+		return 0, false
+	}
+
+	return c.lambdaPricing.GBSecondPrice, true
 }

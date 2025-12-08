@@ -50,7 +50,7 @@ func TestSupports(t *testing.T) {
 
 		// Stub/limited support resource types
 		{
-			name: "S3 with limited support",
+			name: "S3 fully supported",
 			req: &pbc.SupportsRequest{
 				Resource: &pbc.ResourceDescriptor{
 					Provider:     "aws",
@@ -59,10 +59,10 @@ func TestSupports(t *testing.T) {
 				},
 			},
 			wantSupported:    true,
-			wantReasonSubstr: "Limited support",
+			wantReasonSubstr: "",
 		},
 		{
-			name: "Lambda with limited support",
+			name: "Lambda fully supported",
 			req: &pbc.SupportsRequest{
 				Resource: &pbc.ResourceDescriptor{
 					Provider:     "aws",
@@ -71,7 +71,7 @@ func TestSupports(t *testing.T) {
 				},
 			},
 			wantSupported:    true,
-			wantReasonSubstr: "Limited support",
+			wantReasonSubstr: "",
 		},
 		{
 			name: "RDS fully supported",
@@ -235,7 +235,7 @@ func TestSupports(t *testing.T) {
 				},
 			},
 			wantSupported:    true,
-			wantReasonSubstr: "Limited support",
+			wantReasonSubstr: "",
 		},
 
 		// Invalid requests
@@ -392,7 +392,7 @@ func TestSupports_CACentral1(t *testing.T) {
 			wantReasonSubstr: "",
 		},
 		{
-			name: "S3 in ca-central-1 (limited support)",
+			name: "S3 in ca-central-1 (fully supported)",
 			req: &pbc.SupportsRequest{
 				Resource: &pbc.ResourceDescriptor{
 					Provider:     "aws",
@@ -401,7 +401,7 @@ func TestSupports_CACentral1(t *testing.T) {
 				},
 			},
 			wantSupported:    true,
-			wantReasonSubstr: "Limited support",
+			wantReasonSubstr: "",
 		},
 		{
 			name: "EC2 in us-east-1 (wrong for ca-central-1 binary)",
@@ -488,7 +488,7 @@ func TestSupports_SAEast1(t *testing.T) {
 			wantReasonSubstr: "",
 		},
 		{
-			name: "Lambda in sa-east-1 (limited support)",
+			name: "Lambda in sa-east-1 (fully supported)",
 			req: &pbc.SupportsRequest{
 				Resource: &pbc.ResourceDescriptor{
 					Provider:     "aws",
@@ -497,7 +497,7 @@ func TestSupports_SAEast1(t *testing.T) {
 				},
 			},
 			wantSupported:    true,
-			wantReasonSubstr: "Limited support",
+			wantReasonSubstr: "",
 		},
 		{
 			name: "EC2 in eu-west-1 (wrong for sa-east-1 binary)",
@@ -584,7 +584,7 @@ func TestSupports_APSoutheast1(t *testing.T) {
 			wantReasonSubstr: "",
 		},
 		{
-			name: "S3 in ap-southeast-1 (limited support)",
+			name: "S3 in ap-southeast-1 (fully supported)",
 			req: &pbc.SupportsRequest{
 				Resource: &pbc.ResourceDescriptor{
 					Provider:     "aws",
@@ -593,7 +593,7 @@ func TestSupports_APSoutheast1(t *testing.T) {
 				},
 			},
 			wantSupported:    true,
-			wantReasonSubstr: "Limited support",
+			wantReasonSubstr: "",
 		},
 		{
 			name: "EC2 in us-east-1 (wrong for ap-southeast-1 binary)",

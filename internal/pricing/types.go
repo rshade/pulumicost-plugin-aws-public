@@ -57,6 +57,14 @@ type ebsPrice struct {
 	Currency       string
 }
 
+// s3Price represents the per-GB-month storage cost for S3 buckets.
+// Distilled from raw AWS pricing JSON for fast lookups.
+type s3Price struct {
+	Unit           string
+	RatePerGBMonth float64
+	Currency       string
+}
+
 // rdsInstancePrice represents the hourly compute cost for RDS instances
 type rdsInstancePrice struct {
 	Unit       string
@@ -80,4 +88,14 @@ type eksPrice struct {
 	StandardHourlyRate float64 // Standard support hourly rate
 	ExtendedHourlyRate float64 // Extended support hourly rate
 	Currency           string
+}
+
+// lambdaPrice represents the pricing for AWS Lambda functions.
+// Lambda pricing has two dimensions:
+//   - Request pricing: $0.20 per million requests
+//   - Duration pricing: $0.0000166667 per GB-second
+type lambdaPrice struct {
+	RequestPrice  float64 // Price per request ($/request)
+	GBSecondPrice float64 // Price per GB-second ($/GB-second)
+	Currency      string
 }
