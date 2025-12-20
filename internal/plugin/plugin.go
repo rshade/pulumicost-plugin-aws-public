@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+	"github.com/rshade/pulumicost-plugin-aws-public/internal/carbon"
 	"github.com/rshade/pulumicost-plugin-aws-public/internal/pricing"
 	"github.com/rshade/pulumicost-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/pulumicost-spec/sdk/go/proto/pulumicost/v1"
@@ -19,16 +20,37 @@ import (
 
 // AWSPublicPlugin implements the pluginsdk.Plugin interface for AWS public pricing.
 type AWSPublicPlugin struct {
-	region   string
-	pricing  pricing.PricingClient
-	logger   zerolog.Logger // logger is immutable (copy-on-write)
-	testMode bool           // true when PULUMICOST_TEST_MODE=true
+	region          string
+	pricing         pricing.PricingClient
+	carbonEstimator carbon.CarbonEstimator
+	logger          zerolog.Logger // logger is immutable (copy-on-write)
+	testMode        bool           // true when PULUMICOST_TEST_MODE=true
 }
 
 // NewAWSPublicPlugin creates a new AWSPublicPlugin instance.
 // The region should match the region for which pricing data is embedded.
 // The logger should be created using pluginsdk.NewPluginLogger for consistency.
-// Test mode is determined from PULUMICOST_TEST_MODE environment variable at construction.
+// NewAWSPublicPlugin creates and returns a configured AWSPublicPlugin for the given AWS region.
+// It initializes the pricing client, a carbon estimator, and copies the provided logger.
+// Test mode is determined from the PULUMICOST_TEST_MODE environment variable and, if enabled, will be logged.
+//
+// Parameters:
+//   - region: AWS region used for pricing and region-specific lookups.
+//   - pricingClient: client used to fetch AWS pricing information.
+//   - logger: zerolog.Logger to use for plugin logging.
+//
+// Returns:
+// NewAWSPublicPlugin creates and returns an AWSPublicPlugin configured for the given AWS region.
+// The returned plugin is initialized with the provided pricing client and logger, a new carbon estimator,
+// and a test mode flag derived from the environment.
+//
+// Parameters:
+//   - region: AWS region used for pricing and lookups.
+//   - pricingClient: client used to retrieve AWS pricing data.
+//   - logger: logger used by the plugin for structured logs.
+//
+// Returns:
+//   A pointer to an initialized AWSPublicPlugin.
 func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logger zerolog.Logger) *AWSPublicPlugin {
 	testMode := IsTestMode()
 
@@ -37,10 +59,11 @@ func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logg
 	}
 
 	return &AWSPublicPlugin{
-		region:   region,
-		pricing:  pricingClient,
-		logger:   logger,
-		testMode: testMode,
+		region:          region,
+		pricing:         pricingClient,
+		carbonEstimator: carbon.NewEstimator(),
+		logger:          logger,
+		testMode:        testMode,
 	}
 }
 

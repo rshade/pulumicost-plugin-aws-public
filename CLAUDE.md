@@ -106,6 +106,14 @@ cmd/
   pulumicost-plugin-aws-public/     # gRPC service entrypoint
     main.go                          # Calls pluginsdk.Serve()
 internal/
+  carbon/
+    constants.go     # PUE, default utilization, hours per month
+    estimator.go     # CarbonEstimator interface and CCF formula
+    grid_factors.go  # AWS region grid emission factors
+    instance_specs.go  # go:embed CSV parsing with sync.Once
+    utilization.go   # Utilization priority logic
+    data/
+      ccf_instance_specs.csv  # Embedded CCF instance power data
   plugin/
     plugin.go        # Implements Plugin interface from pluginsdk
     supports.go      # Supports() logic for resource type + region checks
@@ -126,6 +134,11 @@ data/
 ```
 
 ## Common Commands
+
+> **⚠️ IMPORTANT:** Before building, run `make generate-carbon-data` to
+> generate the CCF instance specs CSV. This file is in `.gitignore` and
+> required for carbon estimation. The build will panic at startup if missing.
+> Use `make develop` to set up the complete development environment.
 
 ### Building
 ```bash
@@ -176,6 +189,22 @@ go test -tags=integration ./internal/plugin/... -run TestIntegration_TraceIDProp
 # Generate pricing data from AWS Price List API
 go run ./tools/generate-pricing --regions us-east-1,us-west-2,eu-west-1 --out-dir ./data
 ```
+
+### Generating Carbon Data
+```bash
+# Fetch CCF instance specs for carbon estimation (from cloud-carbon-coefficients repo)
+go run ./tools/generate-carbon-data --out-dir ./internal/carbon/data
+
+# Or use make target
+make generate-carbon-data
+```
+
+The tool downloads AWS instance power specifications from the
+[cloud-carbon-coefficients](https://github.com/cloud-carbon-footprint/cloud-carbon-coefficients)
+repository (Apache 2.0 license). The CSV is embedded at build time via `//go:embed`.
+
+**Note:** This file is in `.gitignore` and must be generated before building.
+Run `make develop` to set up the complete development environment.
 
 ### Running the Plugin
 ```bash
@@ -268,15 +297,15 @@ From `pulumicost.v1.ErrorCode`:
 Each service estimate covers specific cost components. Understanding what is included
 and excluded helps users accurately estimate total infrastructure costs.
 
-| Service | Included | Excluded |
-|---------|----------|----------|
-| EC2 | On-demand instance hours | Spot, Reserved, data transfer, EBS |
-| EBS | Storage GB-month | IOPS, throughput, snapshots |
-| EKS | Control plane hours | Worker nodes, add-ons, data transfer |
-| RDS | Not implemented | - |
-| S3 | Not implemented | - |
-| Lambda | Not implemented | - |
-| DynamoDB | Not implemented | - |
+| Service | Included | Excluded | Carbon |
+|---------|----------|----------|--------|
+| EC2 | On-demand instance hours | Spot, Reserved, data transfer, EBS | ✅ gCO2e |
+| EBS | Storage GB-month | IOPS, throughput, snapshots | ❌ [#135](https://github.com/rshade/pulumicost-plugin-aws-public/issues/135) |
+| EKS | Control plane hours | Worker nodes, add-ons, data transfer | ❌ [#136](https://github.com/rshade/pulumicost-plugin-aws-public/issues/136) |
+| RDS | Not implemented | - | ❌ [#137](https://github.com/rshade/pulumicost-plugin-aws-public/issues/137) |
+| S3 | Not implemented | - | ❌ [#137](https://github.com/rshade/pulumicost-plugin-aws-public/issues/137) |
+| Lambda | Not implemented | - | ❌ [#137](https://github.com/rshade/pulumicost-plugin-aws-public/issues/137) |
+| DynamoDB | Not implemented | - | ❌ [#137](https://github.com/rshade/pulumicost-plugin-aws-public/issues/137) |
 
 ### EKS Clusters
 
@@ -315,6 +344,48 @@ To estimate total EKS cluster cost, sum:
   - Provisioned throughput (gp3)
   - Snapshot storage costs
   - Data transfer costs
+
+### Carbon Estimation (EC2 Only)
+
+Carbon footprint estimation uses the Cloud Carbon Footprint (CCF) methodology.
+
+**Formula:**
+```text
+avgWatts = minWatts + (utilization × (maxWatts - minWatts))
+energyKWh = (avgWatts × vCPUs × hours) / 1000
+energyWithPUE = energyKWh × 1.135  (AWS PUE)
+carbonGrams = energyWithPUE × gridIntensity × 1,000,000
+```
+
+**Data Sources:**
+- Instance power specs: [cloud-carbon-coefficients](https://github.com/cloud-carbon-footprint/cloud-carbon-coefficients) (Apache 2.0)
+- Grid emission factors: 12 AWS regions (metric tons CO2eq/kWh)
+
+**Supported Metrics:**
+- `METRIC_KIND_CARBON_FOOTPRINT` in `ImpactMetrics`
+- Unit: gCO2e (grams CO2 equivalent)
+
+**Utilization Priority:**
+1. Per-resource: `ResourceDescriptor.UtilizationPercentage`
+2. Request-level: `GetProjectedCostRequest.UtilizationPercentage`
+3. Default: 50%
+
+**Limitations (v1):**
+- GPU power consumption not included
+- Only EC2 instances (not EBS, EKS, etc.)
+- Embodied carbon not calculated
+
+**Future Enhancements:**
+- [#135](https://github.com/rshade/pulumicost-plugin-aws-public/issues/135) - EBS storage carbon estimation
+- [#136](https://github.com/rshade/pulumicost-plugin-aws-public/issues/136) - EKS cluster carbon estimation
+- [#137](https://github.com/rshade/pulumicost-plugin-aws-public/issues/137) - S3, Lambda, RDS, DynamoDB carbon
+- [#138](https://github.com/rshade/pulumicost-plugin-aws-public/issues/138) - GPU power consumption coefficients
+- [#139](https://github.com/rshade/pulumicost-plugin-aws-public/issues/139) - Embodied carbon calculation
+- [#140](https://github.com/rshade/pulumicost-plugin-aws-public/issues/140) - Annual grid factor update process
+
+**Files:**
+- `internal/carbon/` - Carbon estimation module
+- `internal/carbon/data/ccf_instance_specs.csv` - Embedded instance specs (via `make generate-carbon-data`)
 
 ## Code Style Guidelines
 
@@ -437,6 +508,12 @@ func main() {
 3. Extend `tools/generate-pricing` to fetch pricing for the new service
 4. Update `internal/pricing/client.go` with thread-safe lookup methods for the new service
 5. Add tests for the new resource type
+6. **Research carbon estimation data** for the new service:
+   - Check [Cloud Carbon Footprint](https://www.cloudcarbonfootprint.org/docs/methodology) for applicable coefficients
+   - If data exists, add carbon estimation to `internal/carbon/` and return `ImpactMetrics`
+   - If no data, document in the service's billing_detail that carbon is not available
+   - Update `getSupportedMetrics()` in `supports.go` to advertise carbon capability
+   - Related issues: #135 (EBS), #136 (EKS), #137 (stub services)
 
 ### Working with Build Tags
 - Region-specific files use build tags like `//go:build region_use1`
@@ -541,6 +618,8 @@ the commit message follows conventional commits format.
 ## Active Technologies
 - Go 1.25+ + pulumicost-spec v0.4.8 (pluginsdk, mapping packages), (013-sdk-migration)
 - N/A (embedded pricing data via go:embed) (013-sdk-migration)
+- Go 1.25+ + pulumicost-spec v0.4.10+ (MetricKind, ImpactMetric), zerolog, gRPC (015-carbon-estimation)
+- Embedded data via `//go:embed` (CSV for instance specs, constants for grid factors) (015-carbon-estimation)
 
 - **Go 1.25+** with gRPC via pulumicost-spec/sdk/go/pluginsdk
 - **pulumicost-spec** protos for CostSourceService API
