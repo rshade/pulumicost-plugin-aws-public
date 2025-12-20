@@ -35,7 +35,10 @@ var (
 )
 
 // parseInstanceSpecs parses the embedded CSV data into the instanceSpecs map.
-// This function is called exactly once via sync.Once.
+// parseInstanceSpecs initializes the package-level instanceSpecs map by parsing the embedded CSV of EC2 instance power specifications.
+// It reads the CSV, skips the header, and loads only rows with a non-empty instance type, a positive vCPU count, and valid min/max watt values.
+// European-formatted decimals (comma as decimal separator) are accepted; malformed or incomplete rows are ignored.
+// This function is intended to be executed exactly once (via sync.Once) and sets instanceSpecs for subsequent lookups.
 func parseInstanceSpecs() {
 	instanceSpecs = make(map[string]InstanceSpec)
 
@@ -91,7 +94,9 @@ func parseInstanceSpecs() {
 	}
 }
 
-// parseEuropeanFloat parses a float from European format (comma as decimal separator).
+// parseEuropeanFloat parses a decimal number that may use a comma as the decimal
+// separator and returns it as a float64. It trims surrounding whitespace, converts
+// any commas to periods, and parses the result; on parse failure it returns 0.
 func parseEuropeanFloat(s string) float64 {
 	s = strings.TrimSpace(s)
 	// Replace comma with period for European format
@@ -104,7 +109,9 @@ func parseEuropeanFloat(s string) float64 {
 }
 
 // GetInstanceSpec returns the power consumption specification for an instance type.
-// Returns false if the instance type is not found in the CCF data.
+// GetInstanceSpec retrieves the InstanceSpec for the given EC2 instance type from the embedded CCF data.
+// It initializes and caches the data on first use.
+// The returned boolean is `true` if a matching spec was found, `false` otherwise.
 func GetInstanceSpec(instanceType string) (InstanceSpec, bool) {
 	instanceSpecsOnce.Do(parseInstanceSpecs)
 	spec, ok := instanceSpecs[instanceType]
@@ -112,7 +119,9 @@ func GetInstanceSpec(instanceType string) (InstanceSpec, bool) {
 }
 
 // InstanceSpecCount returns the number of loaded instance specifications.
-// Useful for testing and validation.
+// InstanceSpecCount reports the number of loaded instance specifications.
+// It ensures the embedded CSV has been parsed once (lazy initialization) before counting.
+// The count is the number of valid instance types parsed from the embedded data.
 func InstanceSpecCount() int {
 	instanceSpecsOnce.Do(parseInstanceSpecs)
 	return len(instanceSpecs)

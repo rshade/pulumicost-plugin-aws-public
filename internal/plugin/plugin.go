@@ -30,7 +30,17 @@ type AWSPublicPlugin struct {
 // NewAWSPublicPlugin creates a new AWSPublicPlugin instance.
 // The region should match the region for which pricing data is embedded.
 // The logger should be created using pluginsdk.NewPluginLogger for consistency.
-// Test mode is determined from PULUMICOST_TEST_MODE environment variable at construction.
+// NewAWSPublicPlugin creates and returns a configured AWSPublicPlugin for the given AWS region.
+// It initializes the pricing client, a carbon estimator, and copies the provided logger.
+// Test mode is determined from the PULUMICOST_TEST_MODE environment variable and, if enabled, will be logged.
+//
+// Parameters:
+//   - region: AWS region used for pricing and region-specific lookups.
+//   - pricingClient: client used to fetch AWS pricing information.
+//   - logger: zerolog.Logger to use for plugin logging.
+//
+// Returns:
+//   A pointer to an initialized AWSPublicPlugin.
 func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logger zerolog.Logger) *AWSPublicPlugin {
 	testMode := IsTestMode()
 

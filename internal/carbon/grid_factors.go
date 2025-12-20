@@ -23,7 +23,9 @@ var GridEmissionFactors = map[string]float64{
 const DefaultGridFactor = 0.00039278
 
 // GetGridFactor returns the grid emission factor for a region.
-// Falls back to DefaultGridFactor if the region is not found.
+// GetGridFactor retrieves the grid carbon emission factor for the given AWS region.
+// If the region is not present in GridEmissionFactors, DefaultGridFactor is returned.
+// The factor is expressed in metric tons CO2e per kWh.
 func GetGridFactor(region string) float64 {
 	if factor, ok := GridEmissionFactors[region]; ok {
 		return factor

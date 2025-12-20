@@ -143,7 +143,10 @@ func (p *AWSPublicPlugin) Supports(ctx context.Context, req *pbc.SupportsRequest
 
 // getSupportedMetrics returns the list of supported metric kinds for a given resource type.
 // Currently, only EC2 supports carbon footprint estimation.
-// This function enables PulumiCost core to discover which plugins provide which metrics.
+// getSupportedMetrics returns the metric kinds supported for the given normalized resource type.
+// It currently returns carbon-footprint for "ec2" and nil for other resource types.
+// resourceType is the normalized resource type (for example, "ec2").
+// The returned slice contains supported pbc.MetricKind values or nil if no metrics are supported.
 func getSupportedMetrics(resourceType string) []pbc.MetricKind {
 	switch resourceType {
 	case "ec2":

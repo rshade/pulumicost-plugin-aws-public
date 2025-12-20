@@ -7,7 +7,12 @@ package carbon
 //   - requestUtil: Utilization from GetProjectedCostRequest.UtilizationPercentage
 //   - perResourceUtil: Utilization from ResourceDescriptor.UtilizationPercentage (nil if not set)
 //
-// Returns: Clamped utilization value between 0.0 and 1.0
+// GetUtilization determines the CPU utilization value to use for carbon calculations.
+// It selects a value by priority: a non-nil perResourceUtil greater than 0, then
+// requestUtil if greater than 0, and finally DefaultUtilization. Any selected value
+// is clamped to the range [0.0, 1.0]; if perResourceUtil is nil it is ignored.
+//
+ // Returns the chosen utilization as a float64 in the range [0.0, 1.0].
 func GetUtilization(requestUtil float64, perResourceUtil *float64) float64 {
 	// Priority 1: Per-resource override
 	if perResourceUtil != nil && *perResourceUtil > 0 {
