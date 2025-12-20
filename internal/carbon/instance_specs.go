@@ -38,7 +38,9 @@ var (
 // parseInstanceSpecs initializes the package-level instanceSpecs map by parsing the embedded CSV of EC2 instance power specifications.
 // It reads the CSV, skips the header, and loads only rows with a non-empty instance type, a positive vCPU count, and valid min/max watt values.
 // European-formatted decimals (comma as decimal separator) are accepted; malformed or incomplete rows are ignored.
-// This function is intended to be executed exactly once (via sync.Once) and sets instanceSpecs for subsequent lookups.
+// parseInstanceSpecs initializes the package-level instanceSpecs map by parsing the embedded CSV of instance power specifications.
+// It populates entries whose rows contain a non-empty instance type, a vCPU count of at least 1, and valid power values where MinWatts >= 0 and MaxWatts >= MinWatts.
+// Malformed or incomplete rows are skipped. This function is intended to be invoked once (e.g., via sync.Once) to populate the lookup map.
 func parseInstanceSpecs() {
 	instanceSpecs = make(map[string]InstanceSpec)
 
@@ -96,7 +98,9 @@ func parseInstanceSpecs() {
 
 // parseEuropeanFloat parses a decimal number that may use a comma as the decimal
 // separator and returns it as a float64. It trims surrounding whitespace, converts
-// any commas to periods, and parses the result; on parse failure it returns 0.
+// parseEuropeanFloat parses s as a float64 treating an optional comma as the decimal separator.
+// It trims surrounding whitespace and accepts either '.' or ',' as the decimal point.
+// Returns the parsed value, or 0 if s cannot be parsed as a floating-point number.
 func parseEuropeanFloat(s string) float64 {
 	s = strings.TrimSpace(s)
 	// Replace comma with period for European format
@@ -111,7 +115,10 @@ func parseEuropeanFloat(s string) float64 {
 // GetInstanceSpec returns the power consumption specification for an instance type.
 // GetInstanceSpec retrieves the InstanceSpec for the given EC2 instance type from the embedded CCF data.
 // It initializes and caches the data on first use.
-// The returned boolean is `true` if a matching spec was found, `false` otherwise.
+// GetInstanceSpec retrieves the loaded InstanceSpec for the given EC2 instance type.
+// It ensures the embedded CSV data is parsed once on first use and looks up the exact
+// instanceType key in the internal registry. It returns the InstanceSpec and `true`
+// if a matching spec was found, `false` otherwise.
 func GetInstanceSpec(instanceType string) (InstanceSpec, bool) {
 	instanceSpecsOnce.Do(parseInstanceSpecs)
 	spec, ok := instanceSpecs[instanceType]
@@ -121,7 +128,9 @@ func GetInstanceSpec(instanceType string) (InstanceSpec, bool) {
 // InstanceSpecCount returns the number of loaded instance specifications.
 // InstanceSpecCount reports the number of loaded instance specifications.
 // It ensures the embedded CSV has been parsed once (lazy initialization) before counting.
-// The count is the number of valid instance types parsed from the embedded data.
+// InstanceSpecCount reports the number of loaded instance specifications.
+// It performs lazy initialization by parsing the embedded CSV on the first call.
+// The returned value is the count of valid instance types parsed from the embedded data.
 func InstanceSpecCount() int {
 	instanceSpecsOnce.Do(parseInstanceSpecs)
 	return len(instanceSpecs)
