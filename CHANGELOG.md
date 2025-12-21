@@ -1,14 +1,26 @@
 # Changelog
 
-## [0.0.13](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.12...v0.0.13) (2025-12-21)
+## [0.0.14](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.13...v0.0.14) (2025-12-21)
 
+### Bug Fixes
+
+* **release:** correct verify script to match actual archive naming pattern ([d46ccd3](https://github.com/rshade/pulumicost-plugin-aws-public/commit/d46ccd36c8d31a1868a81bcea6f1cd87b7993a0e))
+
+### Documentation
+
+* updating claude.md for size issues ([#187](https://github.com/rshade/pulumicost-plugin-aws-public/issues/187)) ([2bfd8d9](https://github.com/rshade/pulumicost-plugin-aws-public/commit/2bfd8d9059a6b607d1973ee4622505a77d52e725))
+
+## [0.0.13](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.12...v0.0.13) (2025-12-21)
 
 ### Bug Fixes
 
 * **deps:** update module github.com/rshade/pulumicost-plugin-aws-public to v0.0.12 ([#173](https://github.com/rshade/pulumicost-plugin-aws-public/issues/173)) ([a1b7dc7](https://github.com/rshade/pulumicost-plugin-aws-public/commit/a1b7dc73d5704e031daa1143ffc4073827246303))
 
-## [0.0.12](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.11...v0.0.12) (2025-12-21)
+### Miscellaneous
 
+* **pricing:** embed raw AWS pricing JSON per service ([#172](https://github.com/rshade/pulumicost-plugin-aws-public/issues/172)) ([b6898f1](https://github.com/rshade/pulumicost-plugin-aws-public/commit/b6898f1b31413bec04eb8eb8ed3e49f24ada0c32))
+
+## [0.0.12](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.11...v0.0.12) (2025-12-21)
 
 ### Bug Fixes
 
@@ -17,11 +29,9 @@
 
 ## [0.0.11](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.10...v0.0.11) (2025-12-20)
 
-
 ### Features
 
 * **elb:** implement Elastic Load Balancing (ALB/NLB) cost estimation ([#154](https://github.com/rshade/pulumicost-plugin-aws-public/issues/154)) ([62989a0](https://github.com/rshade/pulumicost-plugin-aws-public/commit/62989a0b0245d05c771c9317db1269776f674dcf)), closes [#017](https://github.com/rshade/pulumicost-plugin-aws-public/issues/017)
-
 
 ### Bug Fixes
 
@@ -30,14 +40,12 @@
 
 ## [0.0.10](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.9...v0.0.10) (2025-12-20)
 
-
 ### Features
 
 * **carbon:** implement carbon emission estimation for EC2 instances ([#132](https://github.com/rshade/pulumicost-plugin-aws-public/issues/132)) ([6de8039](https://github.com/rshade/pulumicost-plugin-aws-public/commit/6de80391c5b483a907d0d5851609b9a7daacb3fa))
 * **dynamodb:** implement DynamoDB On-Demand and Provisioned cost est… ([#141](https://github.com/rshade/pulumicost-plugin-aws-public/issues/141)) ([5d5814d](https://github.com/rshade/pulumicost-plugin-aws-public/commit/5d5814ddc1789fcd7ce8dae3ce809a361a0983bf))
 * **lambda:** implement Lambda function cost estimation ([#121](https://github.com/rshade/pulumicost-plugin-aws-public/issues/121)) ([193cc41](https://github.com/rshade/pulumicost-plugin-aws-public/commit/193cc4184687516cd56e07b038b2772047c9cfa1)), closes [#53](https://github.com/rshade/pulumicost-plugin-aws-public/issues/53)
 * **recommendations:** support target_resources batch processing ([#122](https://github.com/rshade/pulumicost-plugin-aws-public/issues/122)) ([80165f6](https://github.com/rshade/pulumicost-plugin-aws-public/commit/80165f69b75864b84bde51b6568f323be0ada09d)), closes [#118](https://github.com/rshade/pulumicost-plugin-aws-public/issues/118)
-
 
 ### Bug Fixes
 
@@ -46,20 +54,12 @@
 * **deps:** update module github.com/rshade/pulumicost-spec to v0.4.10 ([#131](https://github.com/rshade/pulumicost-plugin-aws-public/issues/131)) ([de00623](https://github.com/rshade/pulumicost-plugin-aws-public/commit/de006236e7c5439404a0904de5ecdc9d582b53a0))
 * **deps:** update module github.com/rshade/pulumicost-spec to v0.4.9 ([#119](https://github.com/rshade/pulumicost-plugin-aws-public/issues/119)) ([861b171](https://github.com/rshade/pulumicost-plugin-aws-public/commit/861b17175b2f89f3aded3747e0b95c73b9437083))
 
-## [0.1.0] (2025-12-19)
-
-### Features
-
-* **dynamodb:** implement DynamoDB cost estimation for On-Demand and Provisioned modes ([#54](https://github.com/rshade/pulumicost-plugin-aws-public/issues/54))
-
 ## [0.0.9](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.8...v0.0.9) (2025-12-17)
-
 
 ### Features
 
 * **finops:** implement GetRecommendations RPC for cost optimization ([#106](https://github.com/rshade/pulumicost-plugin-aws-public/issues/106)) ([deb8eff](https://github.com/rshade/pulumicost-plugin-aws-public/commit/deb8effc4cd16cbd1add1c32e6757a5317a7cfbc)), closes [#105](https://github.com/rshade/pulumicost-plugin-aws-public/issues/105)
 * **s3:** implement S3 storage cost estimation ([#99](https://github.com/rshade/pulumicost-plugin-aws-public/issues/99)) ([06167dc](https://github.com/rshade/pulumicost-plugin-aws-public/commit/06167dc150c5119ecb18d08b1b546a482e9ecfee))
-
 
 ### Bug Fixes
 
@@ -70,16 +70,13 @@
 
 ## [0.0.8](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.7...v0.0.8) (2025-12-07)
 
-
 ### Features
 
 * **eks:** add EKS pricing validation and missing pricing test coverage ([#93](https://github.com/rshade/pulumicost-plugin-aws-public/issues/93)) ([de697c4](https://github.com/rshade/pulumicost-plugin-aws-public/commit/de697c49f36ddf6eb6e16c313e8582e38ed8ed52)), closes [#90](https://github.com/rshade/pulumicost-plugin-aws-public/issues/90)
 
-
 ### Bug Fixes
 
 * **eks:** resolve pricing parser zero-value bug and case-sensitive support_type ([#95](https://github.com/rshade/pulumicost-plugin-aws-public/issues/95)) ([8b24250](https://github.com/rshade/pulumicost-plugin-aws-public/commit/8b24250104126abc9dc6e08d144f73220883072c)), closes [#89](https://github.com/rshade/pulumicost-plugin-aws-public/issues/89)
-
 
 ### Documentation
 
@@ -87,22 +84,15 @@
 
 ## [0.0.7](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.6...v0.0.7) (2025-12-07)
 
-
 ### Features
 
 * **eks:** implement EKS cluster cost estimation ([#76](https://github.com/rshade/pulumicost-plugin-aws-public/issues/76)) ([cc5a19a](https://github.com/rshade/pulumicost-plugin-aws-public/commit/cc5a19accba384c05397a77c9c8d65594192a825))
-
 
 ### Bug Fixes
 
 * **resource:** enhance resource type compatibility ([#81](https://github.com/rshade/pulumicost-plugin-aws-public/issues/81)) ([74fd00d](https://github.com/rshade/pulumicost-plugin-aws-public/commit/74fd00dcf7cfc77b08c26574285eb750e58f4379))
 
 ## [0.0.6](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.5...v0.0.6) (2025-12-06)
-
-
-### Features
-
-* **eks:** add EKS cluster cost estimation support ([#57](https://github.com/rshade/pulumicost-plugin-aws-public/issues/57))
 
 ### Bug Fixes
 
@@ -111,19 +101,17 @@
 
 ## [0.0.5](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.4...v0.0.5) (2025-12-06)
 
-
 ### Features
 
 * add support for 4 Asia Pacific AWS regions ([#19](https://github.com/rshade/pulumicost-plugin-aws-public/issues/19)) ([1c19ca5](https://github.com/rshade/pulumicost-plugin-aws-public/commit/1c19ca5cb9f557399068f7daea1405b25b5be984)), closes [#1](https://github.com/rshade/pulumicost-plugin-aws-public/issues/1)
 * add support for additional US regions (us-west-1, us-gov-west-1, us-gov-east-1) ([#46](https://github.com/rshade/pulumicost-plugin-aws-public/issues/46)) ([ce71fd4](https://github.com/rshade/pulumicost-plugin-aws-public/commit/ce71fd45f35379ca9f8db86f12ace007f54950de)), closes [#4](https://github.com/rshade/pulumicost-plugin-aws-public/issues/4)
 * automate region build matrix ([#49](https://github.com/rshade/pulumicost-plugin-aws-public/issues/49)) ([8003dcf](https://github.com/rshade/pulumicost-plugin-aws-public/commit/8003dcff87680c42255c5a6ebb0092389a5b0ed5))
-* **build:** replace sed/awk YAML parsing with Go-based parser  ([#72](https://github.com/rshade/pulumicost-plugin-aws-public/issues/72)) ([df27421](https://github.com/rshade/pulumicost-plugin-aws-public/commit/df27421015168860c140beeedb7b6394d3ac29b6))
+* **build:** replace sed/awk YAML parsing with Go-based parser ([#72](https://github.com/rshade/pulumicost-plugin-aws-public/issues/72)) ([df27421](https://github.com/rshade/pulumicost-plugin-aws-public/commit/df27421015168860c140beeedb7b6394d3ac29b6))
 * implement AWS public pricing plugin with gRPC interface ([5f1de2e](https://github.com/rshade/pulumicost-plugin-aws-public/commit/5f1de2edd0851519cd0998ce077358a65a3eb3d2))
 * implement fallback GetActualCost using runtime × list price ([#34](https://github.com/rshade/pulumicost-plugin-aws-public/issues/34)) ([25122b2](https://github.com/rshade/pulumicost-plugin-aws-public/commit/25122b2a599083d4e324c9815283689219fc0b53)), closes [#24](https://github.com/rshade/pulumicost-plugin-aws-public/issues/24)
 * implement Zerolog Structured Logging with Trace Propagation ([#39](https://github.com/rshade/pulumicost-plugin-aws-public/issues/39)) ([8ab8037](https://github.com/rshade/pulumicost-plugin-aws-public/commit/8ab803714fa9ab6fe96d09adb2a6dd807eba45f2))
 * MVP implementation - AWS public pricing plugin ([b093949](https://github.com/rshade/pulumicost-plugin-aws-public/commit/b093949bb5dab85ad95f3fc415e5d30b948ca887))
-* **pricing:** add Canada and South America regions with real AWS pri… ([#43](https://github.com/rshade/pulumicost-plugin-aws-public/issues/43)) ([2406c34](https://github.com/rshade/pulumicost-plugin-aws-public/commit/2406c34e48ed975358d77b52240c901ed1a1f710))
-
+* **pricing:** add Canada and South America regions with real AWS pricing ([#43](https://github.com/rshade/pulumicost-plugin-aws-public/issues/43)) ([2406c34](https://github.com/rshade/pulumicost-plugin-aws-public/commit/2406c34e48ed975358d77b52240c901ed1a1f710))
 
 ### Bug Fixes
 
@@ -139,19 +127,16 @@
 * **deps:** update module github.com/rshade/pulumicost-spec to v0.4.2 ([#47](https://github.com/rshade/pulumicost-plugin-aws-public/issues/47)) ([21dbb97](https://github.com/rshade/pulumicost-plugin-aws-public/commit/21dbb97f4ccc7a0ea23f535128cc97d87eaa74e2))
 * **deps:** update module github.com/rshade/pulumicost-spec to v0.4.3 ([#69](https://github.com/rshade/pulumicost-plugin-aws-public/issues/69)) ([b56c439](https://github.com/rshade/pulumicost-plugin-aws-public/commit/b56c439873dec68432d6ff621308e90663692d1d))
 
-
 ### Documentation
 
 * clarify zerolog logging requirements in constitution v2.1.1 ([#74](https://github.com/rshade/pulumicost-plugin-aws-public/issues/74)) ([88e8d2f](https://github.com/rshade/pulumicost-plugin-aws-public/commit/88e8d2f585a73f26fe22bf28903c931ebd43f7db))
-* updating the coonstitution ([0c15505](https://github.com/rshade/pulumicost-plugin-aws-public/commit/0c1550548c65d2646f7d30243c19f0246220297a))
+* updating the constitution ([0c15505](https://github.com/rshade/pulumicost-plugin-aws-public/commit/0c1550548c65d2646f7d30243c19f0246220297a))
 
 ## [0.0.4](https://github.com/rshade/pulumicost-plugin-aws-public/compare/pulumicost-plugin-aws-public-v0.0.3...pulumicost-plugin-aws-public-v0.0.4) (2025-11-30)
 
-
 ### Features
 
-* **pricing:** add Canada and South America regions with real AWS pri… ([#43](https://github.com/rshade/pulumicost-plugin-aws-public/issues/43)) ([2406c34](https://github.com/rshade/pulumicost-plugin-aws-public/commit/2406c34e48ed975358d77b52240c901ed1a1f710))
-
+* **pricing:** add Canada and South America regions with real AWS pricing ([#43](https://github.com/rshade/pulumicost-plugin-aws-public/issues/43)) ([2406c34](https://github.com/rshade/pulumicost-plugin-aws-public/commit/2406c34e48ed975358d77b52240c901ed1a1f710))
 
 ### Bug Fixes
 
@@ -159,11 +144,9 @@
 
 ## [0.0.3](https://github.com/rshade/pulumicost-plugin-aws-public/compare/pulumicost-plugin-aws-public-v0.0.2...pulumicost-plugin-aws-public-v0.0.3) (2025-11-29)
 
-
 ### Features
 
 * implement Zerolog Structured Logging with Trace Propagation ([#39](https://github.com/rshade/pulumicost-plugin-aws-public/issues/39)) ([8ab8037](https://github.com/rshade/pulumicost-plugin-aws-public/commit/8ab803714fa9ab6fe96d09adb2a6dd807eba45f2))
-
 
 ### Bug Fixes
 
@@ -172,11 +155,9 @@
 
 ## [0.0.2](https://github.com/rshade/pulumicost-plugin-aws-public/compare/pulumicost-plugin-aws-public-v0.0.1...pulumicost-plugin-aws-public-v0.0.2) (2025-11-26)
 
-
 ### Features
 
 * implement fallback GetActualCost using runtime × list price ([#34](https://github.com/rshade/pulumicost-plugin-aws-public/issues/34)) ([25122b2](https://github.com/rshade/pulumicost-plugin-aws-public/commit/25122b2a599083d4e324c9815283689219fc0b53)), closes [#24](https://github.com/rshade/pulumicost-plugin-aws-public/issues/24)
-
 
 ### Bug Fixes
 
@@ -184,13 +165,11 @@
 
 ## [0.0.1](https://github.com/rshade/pulumicost-plugin-aws-public/compare/pulumicost-plugin-aws-public-v0.0.1...pulumicost-plugin-aws-public-v0.0.1) (2025-11-26)
 
-
 ### Features
 
 * add support for 4 Asia Pacific AWS regions ([#19](https://github.com/rshade/pulumicost-plugin-aws-public/issues/19)) ([1c19ca5](https://github.com/rshade/pulumicost-plugin-aws-public/commit/1c19ca5cb9f557399068f7daea1405b25b5be984)), closes [#1](https://github.com/rshade/pulumicost-plugin-aws-public/issues/1)
 * implement AWS public pricing plugin with gRPC interface ([5f1de2e](https://github.com/rshade/pulumicost-plugin-aws-public/commit/5f1de2edd0851519cd0998ce077358a65a3eb3d2))
 * MVP implementation - AWS public pricing plugin ([b093949](https://github.com/rshade/pulumicost-plugin-aws-public/commit/b093949bb5dab85ad95f3fc415e5d30b948ca887))
-
 
 ### Bug Fixes
 
@@ -199,7 +178,6 @@
 * **deps:** update github.com/rshade/pulumicost-core digest to c93f761 ([#21](https://github.com/rshade/pulumicost-plugin-aws-public/issues/21)) ([060cb63](https://github.com/rshade/pulumicost-plugin-aws-public/commit/060cb6316d28d21fd2ff788e8eff5327e7f17a8c))
 * **deps:** update module github.com/rshade/pulumicost-spec to v0.3.0 ([#12](https://github.com/rshade/pulumicost-plugin-aws-public/issues/12)) ([e4d435d](https://github.com/rshade/pulumicost-plugin-aws-public/commit/e4d435d5ca86ab9402f272fd44c362a5eef7246f))
 
-
 ### Documentation
 
-* updating the coonstitution ([0c15505](https://github.com/rshade/pulumicost-plugin-aws-public/commit/0c1550548c65d2646f7d30243c19f0246220297a))
+* updating the constitution ([0c15505](https://github.com/rshade/pulumicost-plugin-aws-public/commit/0c1550548c65d2646f7d30243c19f0246220297a))
