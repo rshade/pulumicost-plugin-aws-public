@@ -91,7 +91,7 @@ Pricing data is embedded as separate per-service JSON files for maintainability:
 **Build Process:**
 
 1. `tools/generate-pricing` fetches AWS public pricing per service
-2. Filters out Reserved Instance and Savings Plans terms (reduces EC2 from ~400MB to ~154MB)
+2. Filters out Reserved Instance and Savings Plans terms (see [Pricing Term Filtering](#pricing-term-filtering))
 3. Output: `internal/pricing/data/{service}_{region}.json` files
 4. Files embedded via `//go:embed` in region-specific files (`embed_use1.go`, etc.)
 
@@ -127,6 +127,49 @@ go test -tags=region_use1 -bench=BenchmarkNewClient -benchmem ./internal/pricing
 - `sync.Once` ensures parsing happens exactly once
 - Lookup methods are read-only after initialization
 - Safe for concurrent gRPC calls
+
+### Pricing Term Filtering
+
+The pricing generator (`tools/generate-pricing`) filters AWS pricing data to keep only
+On-Demand terms, reducing binary size significantly while maintaining full functionality:
+
+| Service | With RI/SP | OnDemand Only | Reduction |
+|---------|------------|---------------|-----------|
+| EC2     | ~400MB     | ~154MB        | 61%       |
+| Other services | Varies | Minimal savings | <5% |
+
+**What is filtered:**
+
+The AWS Price List API returns multiple term types in the `terms` object:
+
+- **OnDemand** (KEPT): Pay-as-you-go pricing with no commitment
+- **Reserved** (FILTERED): Reserved Instance pricing (1yr, 3yr upfront commitments)
+  - Typically 30-75% discount vs OnDemand, but requires commitment
+  - ~14,000 SKUs for EC2 in us-east-1 alone
+- **savingsPlan** (FILTERED): Savings Plans pricing (flexible discount program)
+
+**Why filter:**
+
+1. **Binary size**: Reduces EC2 data from ~400MB to ~154MB (61% reduction)
+2. **Scope alignment**: Plugin only supports On-Demand pricing for v1
+3. **User expectation**: On-demand is the default/fallback pricing model
+
+**Implications for users:**
+
+- Plugin estimates **On-Demand costs only**
+- Reserved Instance and Savings Plans discounts are NOT reflected
+- For RI/SP pricing, users need different data sources (CUR, Cost Explorer, Vantage)
+
+**Adding RI/SP support (future consideration):**
+
+If Reserved/Savings Plans cost estimation is needed, consider:
+
+1. **Separate binary**: RI/SP data is too large to embed with OnDemand (would exceed reasonable binary size)
+2. **External data source**: API call rather than embedded data
+3. **User-provided pricing**: Import from their AWS account (CUR export)
+4. **Hybrid approach**: On-demand embedded + optional RI/SP overlay from external source
+
+**Code location:** `tools/generate-pricing/main.go` in `fetchServicePricingRaw()` function, lines 188-211.
 
 ### ⚠️ CRITICAL: No Pricing Data Filtering
 
