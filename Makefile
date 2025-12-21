@@ -6,6 +6,17 @@ REGIONS := $(shell $(PARSE_REGIONS) -field name)
 REGIONS_CSV := $(shell $(PARSE_REGIONS) -field name | tr '\n' ',' | sed 's/,$$//')
 REGION_COUNT := $(words $(REGIONS))
 
+# Development version: latest tag + patch increment + "-dev" suffix
+# Example: v0.0.12 -> 0.0.13-dev
+LATEST_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+LATEST_VERSION := $(shell echo $(LATEST_TAG) | sed 's/^v//')
+MAJOR := $(shell echo $(LATEST_VERSION) | cut -d. -f1)
+MINOR := $(shell echo $(LATEST_VERSION) | cut -d. -f2)
+PATCH := $(shell echo $(LATEST_VERSION) | cut -d. -f3)
+NEXT_PATCH := $(shell echo $$(($(PATCH) + 1)))
+DEV_VERSION := $(MAJOR).$(MINOR).$(NEXT_PATCH)-dev
+LDFLAGS := -X main.version=$(DEV_VERSION)
+
 .PHONY: all
 all: build ## Default target - build the plugin
 
@@ -26,8 +37,10 @@ develop: ensure generate-pricing generate-carbon-data ## Setup development envir
 	@echo "Development environment ready"
 
 .PHONY: generate-pricing
-generate-pricing: ## Generate pricing data for all regions
-	@echo "Generating pricing data for all regions..."
+generate-pricing: ## Generate per-service pricing data for all regions
+	@echo "Generating per-service pricing data for all regions..."
+	@echo "Output: internal/pricing/data/{service}_{region}.json"
+	@echo "Services: ec2, s3, rds, eks, lambda, dynamodb, elb"
 	@go run ./tools/generate-pricing --regions $(REGIONS_CSV) --out-dir ./internal/pricing/data
 
 .PHONY: generate-carbon-data
@@ -78,7 +91,7 @@ build: ## ⚠️  Build with FALLBACK pricing (development only - do NOT release
 	@echo "  make build-region REGION=us-east-1  # Build any region with real pricing"
 	@echo "  make build-all-regions         # Build all 12 regions"
 	@echo ""
-	@go build -o pulumicost-plugin-aws-public ./cmd/pulumicost-plugin-aws-public
+	@go build -ldflags "$(LDFLAGS)" -o pulumicost-plugin-aws-public ./cmd/pulumicost-plugin-aws-public
 
 .PHONY: build-default-region
 build-default-region: ## Build us-east-1 with real AWS pricing (RECOMMENDED)
@@ -88,14 +101,14 @@ build-default-region: ## Build us-east-1 with real AWS pricing (RECOMMENDED)
 .PHONY: build-region
 build-region: ## Build region-specific binary (usage: make build-region REGION=us-east-1)
 	@echo "Building plugin for region $(REGION)..."
-	@go build -tags region_$(shell ./scripts/region-tag.sh $(REGION)) -o pulumicost-plugin-aws-public-$(REGION) ./cmd/pulumicost-plugin-aws-public
+	@go build -ldflags "$(LDFLAGS)" -tags region_$(shell ./scripts/region-tag.sh $(REGION)) -o pulumicost-plugin-aws-public-$(REGION) ./cmd/pulumicost-plugin-aws-public
 
 .PHONY: build-all-regions
 build-all-regions: ## Build binaries for all supported regions
 	@echo "Building all $(REGION_COUNT) region binaries..."
 	@for region in $(REGIONS); do \
 		echo "Building $$region..."; \
-		go build -tags region_$$(./scripts/region-tag.sh $$region) -o pulumicost-plugin-aws-public-$$region ./cmd/pulumicost-plugin-aws-public || exit 1; \
+		go build -ldflags "$(LDFLAGS)" -tags region_$$(./scripts/region-tag.sh $$region) -o pulumicost-plugin-aws-public-$$region ./cmd/pulumicost-plugin-aws-public || exit 1; \
 	done
 	@echo "All region binaries built successfully!"
 	@ls -lh pulumicost-plugin-aws-public-*
