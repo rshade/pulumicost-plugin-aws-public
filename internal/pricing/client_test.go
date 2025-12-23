@@ -637,3 +637,141 @@ func BenchmarkNewClient_Parallel(b *testing.B) {
 		}
 	})
 }
+
+// TestClient_parseEC2Pricing_Logic tests the parsing logic with controlled input (T023).
+func TestClient_parseEC2Pricing_Logic(t *testing.T) {
+	// Minimal valid EC2 JSON
+	jsonData := []byte(`{
+		"formatVersion": "v1.0",
+		"offerCode": "AmazonEC2",
+		"version": "test-version",
+		"publicationDate": "2025-01-01T00:00:00Z",
+		"products": {
+			"SKU_TEST": {
+				"sku": "SKU_TEST",
+				"productFamily": "Compute Instance",
+				"attributes": {
+					"instanceType": "test.type",
+					"operatingSystem": "Linux",
+					"tenancy": "Shared",
+					"regionCode": "us-test-1",
+					"capacitystatus": "Used",
+					"preInstalledSw": "NA"
+				}
+			}
+		},
+		"terms": {
+			"OnDemand": {
+				"SKU_TEST": {
+					"SKU_TEST.OFFER": {
+						"offerTermCode": "OFFER",
+						"sku": "SKU_TEST",
+						"priceDimensions": {
+							"SKU_TEST.OFFER.RATE": {
+								"rateCode": "SKU_TEST.OFFER.RATE",
+								"unit": "Hrs",
+								"pricePerUnit": { "USD": "1.2345" }
+							}
+						}
+					}
+				}
+			}
+		}
+	}`)
+
+	// Create a client with NO initialization to avoid parsing embedded data
+	client := &Client{
+		logger:           zerolog.Nop(),
+		ec2Index:         make(map[string]ec2Price),
+		ebsIndex:         make(map[string]ebsPrice),
+		rdsInstanceIndex: make(map[string]rdsInstancePrice),
+		rdsStorageIndex:  make(map[string]rdsStoragePrice),
+		s3Index:          make(map[string]s3Price),
+	}
+
+	// Call the private parser directly
+	// Note: internal/pricing package allows access to unexported methods in test
+	region, meta, err := client.parseEC2Pricing(jsonData)
+	if err != nil {
+		t.Fatalf("parseEC2Pricing failed: %v", err)
+	}
+
+	// Verify region detection
+	if region != "us-test-1" {
+		t.Errorf("expected region 'us-test-1', got '%s'", region)
+	}
+
+	// Verify metadata
+	if meta.Version != "test-version" {
+		t.Errorf("expected version 'test-version', got '%s'", meta.Version)
+	}
+	if meta.OfferCode != "AmazonEC2" {
+		t.Errorf("expected offerCode 'AmazonEC2', got '%s'", meta.OfferCode)
+	}
+
+	// Verify price was indexed
+	key := "test.type/Linux/Shared"
+	price, found := client.ec2Index[key]
+	if !found {
+		t.Fatalf("price for %s not found in index", key)
+	}
+	if price.HourlyRate != 1.2345 {
+		t.Errorf("expected price 1.2345, got %v", price.HourlyRate)
+	}
+}
+
+// TestClient_parseELBPricing_Logic tests the ELB parsing logic with controlled input (T024).
+func TestClient_parseELBPricing_Logic(t *testing.T) {
+	// Minimal valid ELB JSON
+	jsonData := []byte(`{
+		"formatVersion": "v1.0",
+		"offerCode": "AWSELB",
+		"products": {
+			"SKU_ALB": {
+				"sku": "SKU_ALB",
+				"productFamily": "Load Balancer-Application",
+				"attributes": {
+					"regionCode": "us-test-1",
+					"usagetype": "LoadBalancerUsage"
+				}
+			}
+		},
+		"terms": {
+			"OnDemand": {
+				"SKU_ALB": {
+					"SKU_ALB.OFFER": {
+						"priceDimensions": {
+							"SKU_ALB.OFFER.RATE": {
+								"unit": "Hrs",
+								"pricePerUnit": { "USD": "0.0225" }
+							}
+						}
+					}
+				}
+			}
+		}
+	}`)
+
+	client := &Client{
+		logger: zerolog.Nop(),
+		// elbPricing is nil initially
+	}
+
+	// Call private parser
+	region, err := client.parseELBPricing(jsonData)
+	if err != nil {
+		t.Fatalf("parseELBPricing failed: %v", err)
+	}
+
+	if region != "us-test-1" {
+		t.Errorf("expected region 'us-test-1', got '%s'", region)
+	}
+
+	if client.elbPricing == nil {
+		t.Fatal("elbPricing is nil after parsing")
+	}
+
+	if client.elbPricing.ALBHourlyRate != 0.0225 {
+		t.Errorf("expected ALB hourly 0.0225, got %v", client.elbPricing.ALBHourlyRate)
+	}
+}
