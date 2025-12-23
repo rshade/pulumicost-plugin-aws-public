@@ -181,9 +181,9 @@ Pricing data is embedded as separate per-service JSON files for maintainability:
 |---------|--------------|--------------|
 | EC2 | `ec2_{region}.json` | ~154MB |
 | RDS | `rds_{region}.json` | ~7MB |
-| EKS | `eks_{region}.json` | ~772KB |
-| Lambda | `lambda_{region}.json` | ~445KB |
-| S3 | `s3_{region}.json` | ~306KB |
+| EKS | `eks_{region}.json` | ~800KB |
+| Lambda | `lambda_{region}.json` | ~450KB |
+| S3 | `s3_{region}.json` | ~300KB |
 | DynamoDB | `dynamodb_{region}.json` | ~22KB |
 | ELB | `elb_{region}.json` | ~13KB |
 
