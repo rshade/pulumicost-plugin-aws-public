@@ -53,6 +53,8 @@ github.com/rshade/pulumicost-spec v0.4.9 h1:R2GqVYpMlN6SUw2/V99uha+KA9UlvhSR8Qua
 github.com/rshade/pulumicost-spec v0.4.9/go.mod h1:mJ+LSqeFM0dRv4auB63R9NpPbS5YKS/10mDeosdVNJ4=
 github.com/rshade/pulumicost-spec v0.4.10 h1:GJ+9zSZ+NE/+UupNVFAF9S9oyjWeUFf/uK7fNt5KVjA=
 github.com/rshade/pulumicost-spec v0.4.10/go.mod h1:mJ+LSqeFM0dRv4auB63R9NpPbS5YKS/10mDeosdVNJ4=
+github.com/rshade/pulumicost-spec v0.4.11 h1:np+F2bEU+9+0dAfXXBI7v9qQjefn9wYqIXLpQ2HhgPE=
+github.com/rshade/pulumicost-spec v0.4.11/go.mod h1:mJ+LSqeFM0dRv4auB63R9NpPbS5YKS/10mDeosdVNJ4=
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 h1:KRzFb2m7YtdldCEkzs6KqmJw4nqEVZGK7IN2kJkjTuQ=
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.2/go.mod h1:JXeL+ps8p7/KNMjDQk3TCwPpBy0wYklyWTfbkIzdIFU=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
