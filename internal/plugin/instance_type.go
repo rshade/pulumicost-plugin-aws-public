@@ -87,3 +87,64 @@ var gravitonMap = map[string]string{
 	"t3":  "t4g",
 	"t3a": "t4g",
 }
+
+// parseRDSInstanceType splits an RDS instance type into family and size.
+// Example: "db.t3.medium" → ("db.t3", "medium")
+// Returns empty strings if the format is invalid.
+func parseRDSInstanceType(instanceType string) (family, size string) {
+	if !strings.HasPrefix(instanceType, "db.") {
+		return "", ""
+	}
+	// Remove "db." prefix, then split on "."
+	trimmed := strings.TrimPrefix(instanceType, "db.")
+	parts := strings.SplitN(trimmed, ".", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", ""
+	}
+	return "db." + parts[0], parts[1]
+}
+
+// rdsGenerationUpgradeMap maps old RDS families to newer generations.
+// Note: RDS instance availability depends on the database engine.
+var rdsGenerationUpgradeMap = map[string]string{
+	// T-series (burstable)
+	"db.t2": "db.t3",
+	"db.t3": "db.t4g", // Graviton if engine supports it
+
+	// M-series (general purpose)
+	"db.m4":  "db.m5",
+	"db.m5":  "db.m6i",
+	"db.m6i": "db.m7i",
+
+	// R-series (memory optimized)
+	"db.r4":  "db.r5",
+	"db.r5":  "db.r6i",
+	"db.r6i": "db.r7i",
+}
+
+// rdsGravitonMap maps x86 RDS families to Graviton equivalents.
+// Important: Graviton support varies by engine:
+//   - MySQL 8.0+: Full support
+//   - PostgreSQL 12+: Full support
+//   - MariaDB 10.5+: Full support
+//   - Oracle: NOT supported
+//   - SQL Server: NOT supported
+var rdsGravitonMap = map[string]string{
+	"db.m5":  "db.m6g",
+	"db.m6i": "db.m7g",
+	"db.r5":  "db.r6g",
+	"db.r6i": "db.r7g",
+	"db.t3":  "db.t4g",
+}
+
+// rdsGravitonSupportedEngines lists engines that support Graviton instances.
+// Used to filter out Graviton recommendations for unsupported engines.
+var rdsGravitonSupportedEngines = map[string]bool{
+	"mysql":      true,
+	"postgres":   true,
+	"postgresql": true,
+	"mariadb":    true,
+	"aurora":     true, // Aurora MySQL/PostgreSQL
+	"aurora-mysql":      true,
+	"aurora-postgresql": true,
+}

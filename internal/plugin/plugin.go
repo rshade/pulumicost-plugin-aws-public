@@ -225,6 +225,10 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 			Msg("Test mode: GetActualCost request details")
 	}
 
+	// Determine service type once for FOCUS record (used in both branches)
+	normalizedType := normalizeResourceType(resource.ResourceType)
+	serviceType := detectService(normalizedType)
+
 	// Handle zero duration - return $0 with single result
 	if runtimeHours == 0 {
 		// Build source with confidence (Feature 016)
@@ -249,6 +253,16 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 				Timestamp: req.Start,
 				Cost:      0,
 				Source:    source,
+				// FOCUS 1.2 record for FinOps reporting
+				FocusRecord: buildFocusRecord(
+					serviceType,
+					resource.ResourceType,
+					resource.Region,
+					0, 0, // cost and unit price are 0 for zero duration
+					getPricingUnitForService(serviceType),
+					fromTime, toTime,
+					resource.Sku,
+				),
 			}},
 		}, nil
 	}
@@ -308,6 +322,17 @@ func (p *AWSPublicPlugin) GetActualCost(ctx context.Context, req *pbc.GetActualC
 			UsageAmount: runtimeHours,
 			UsageUnit:   "hours",
 			Source:      fullSource,
+			// FOCUS 1.2 record for FinOps reporting
+			FocusRecord: buildFocusRecord(
+				serviceType,
+				resource.ResourceType,
+				resource.Region,
+				actualCost,
+				projectedResp.UnitPrice, // Hourly rate from projected cost
+				"Hours",
+				fromTime, toTime,
+				resource.Sku,
+			),
 		}},
 	}, nil
 }

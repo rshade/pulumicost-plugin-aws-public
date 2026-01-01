@@ -106,6 +106,17 @@ func run() error {
 	config := pluginsdk.ServeConfig{
 		Plugin: awsPlugin,
 		Port:   port, // Use determined port (0 for ephemeral)
+		// PluginInfo enables GetPluginInfo RPC for version negotiation with Core
+		PluginInfo: &pluginsdk.PluginInfo{
+			Name:        "pulumicost-plugin-aws-public",
+			Version:     version, // Injected by GoReleaser via -X main.version
+			SpecVersion: pluginsdk.SpecVersion,
+			Providers:   []string{"aws"},
+			Metadata: map[string]string{
+				"region": region,
+				"type":   "public-pricing-fallback",
+			},
+		},
 	}
 	if err := pluginsdk.Serve(ctx, config); err != nil {
 		logger.Error().Err(err).Msg("server error")

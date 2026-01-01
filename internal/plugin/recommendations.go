@@ -109,6 +109,9 @@ func (p *AWSPublicPlugin) GetRecommendations(ctx context.Context, req *pbc.GetRe
 			recs = p.generateEC2Recommendations(resource.Sku, region)
 		case "ebs":
 			recs = p.getEBSRecommendations(resource.Sku, region, resource.Tags)
+		case "rds":
+			engine := extractRDSEngine(resource.Tags)
+			recs = p.generateRDSRecommendations(resource.Sku, engine, region)
 		}
 
 		// Populate correlation info: Native Id takes priority over tag (FR-001, FR-002, FR-003)
@@ -450,6 +453,230 @@ func (p *AWSPublicPlugin) getEBSRecommendations(
 		},
 		Source: sourceAWSPublic,
 	}}
+}
+
+// extractRDSEngine gets the database engine from resource tags.
+// Falls back to "mysql" if not specified (most common RDS engine).
+// Normalizes engine names for consistent pricing lookup.
+func extractRDSEngine(tags map[string]string) string {
+	if tags == nil {
+		return "mysql"
+	}
+	engine := tags["engine"]
+	if engine == "" {
+		engine = tags["Engine"] // Handle capitalization variants
+	}
+	if engine == "" {
+		return "mysql"
+	}
+	return normalizeRDSEngine(engine)
+}
+
+// normalizeRDSEngine converts engine names to the format used in pricing lookups.
+// Handles common aliases and capitalization variants.
+func normalizeRDSEngine(engine string) string {
+	switch strings.ToLower(strings.TrimSpace(engine)) {
+	case "mysql", "mysql8", "mysql-8.0":
+		return "mysql"
+	case "postgres", "postgresql", "postgres13", "postgres14", "postgres15":
+		return "postgresql"
+	case "mariadb", "maria":
+		return "mariadb"
+	case "oracle", "oracle-ee", "oracle-se", "oracle-se1", "oracle-se2":
+		return "oracle"
+	case "sqlserver", "sql-server", "sqlserver-ee", "sqlserver-se", "sqlserver-ex", "sqlserver-web":
+		return "sqlserver"
+	case "aurora", "aurora-mysql":
+		return "aurora-mysql"
+	case "aurora-postgresql":
+		return "aurora-postgresql"
+	default:
+		return strings.ToLower(engine)
+	}
+}
+
+// generateRDSRecommendations creates recommendations for an RDS instance.
+// Returns up to 2 recommendations: generation upgrade and/or Graviton migration.
+// Graviton is only recommended for engines that support it (MySQL, PostgreSQL, MariaDB).
+func (p *AWSPublicPlugin) generateRDSRecommendations(
+	instanceType, engine, region string,
+) []*pbc.Recommendation {
+	var recommendations []*pbc.Recommendation
+
+	// Generation upgrade
+	if rec := p.getRDSGenerationUpgradeRecommendation(instanceType, engine, region); rec != nil {
+		recommendations = append(recommendations, rec)
+	}
+
+	// Graviton migration (only for supported engines)
+	if rdsGravitonSupportedEngines[strings.ToLower(engine)] {
+		if rec := p.getRDSGravitonRecommendation(instanceType, engine, region); rec != nil {
+			recommendations = append(recommendations, rec)
+		}
+	}
+
+	return recommendations
+}
+
+// getRDSGenerationUpgradeRecommendation returns a recommendation to upgrade to a newer
+// RDS instance generation if available and cost-effective.
+func (p *AWSPublicPlugin) getRDSGenerationUpgradeRecommendation(
+	instanceType, engine, region string,
+) *pbc.Recommendation {
+	family, size := parseRDSInstanceType(instanceType)
+	if family == "" {
+		return nil
+	}
+
+	newFamily, exists := rdsGenerationUpgradeMap[family]
+	if !exists {
+		return nil
+	}
+
+	newType := newFamily + "." + size
+
+	currentPrice, found := p.pricing.RDSOnDemandPricePerHour(instanceType, engine)
+	if !found {
+		return nil
+	}
+
+	newPrice, found := p.pricing.RDSOnDemandPricePerHour(newType, engine)
+	if !found || newPrice > currentPrice {
+		return nil
+	}
+
+	currentMonthly := currentPrice * hoursPerMonth
+	newMonthly := newPrice * hoursPerMonth
+	savings := currentMonthly - newMonthly
+	savingsPercent := 0.0
+	if currentMonthly > 0 {
+		savingsPercent = (savings / currentMonthly) * 100
+	}
+
+	confidence := confidenceHigh
+
+	reasoning := []string{
+		fmt.Sprintf("Newer %s instances offer better performance for %s", newFamily, engine),
+		"Drop-in replacement with no architecture changes required",
+	}
+
+	// Check if there's a Graviton alternative for the recommended family
+	if gravitonFamily, hasGraviton := rdsGravitonMap[newFamily]; hasGraviton && rdsGravitonSupportedEngines[engine] {
+		gravitonType := gravitonFamily + "." + size
+		reasoning = append(reasoning,
+			fmt.Sprintf("Alternative: consider %s for ARM compatibility (~20%% additional savings)", gravitonType))
+	}
+
+	return &pbc.Recommendation{
+		Id:         uuid.New().String(),
+		Category:   pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_COST,
+		ActionType: pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_MODIFY,
+		Resource: &pbc.ResourceRecommendationInfo{
+			Provider:     providerAWS,
+			ResourceType: "rds",
+			Region:       region,
+			Sku:          instanceType,
+		},
+		ActionDetail: &pbc.Recommendation_Modify{
+			Modify: &pbc.ModifyAction{
+				ModificationType:  modTypeGenUpgrade,
+				CurrentConfig:     map[string]string{"instance_type": instanceType, "engine": engine},
+				RecommendedConfig: map[string]string{"instance_type": newType, "engine": engine},
+			},
+		},
+		Impact: &pbc.RecommendationImpact{
+			EstimatedSavings:  savings,
+			Currency:          "USD",
+			ProjectionPeriod:  "monthly",
+			CurrentCost:       currentMonthly,
+			ProjectedCost:     newMonthly,
+			SavingsPercentage: savingsPercent,
+		},
+		Priority:        pbc.RecommendationPriority_RECOMMENDATION_PRIORITY_MEDIUM,
+		ConfidenceScore: &confidence,
+		Description: fmt.Sprintf("Upgrade RDS %s from %s to %s for better performance at same or lower cost",
+			engine, instanceType, newType),
+		Reasoning: reasoning,
+		Source:    sourceAWSPublic,
+	}
+}
+
+// getRDSGravitonRecommendation returns a recommendation to migrate to ARM-based
+// Graviton RDS instances if available and cost-effective.
+// Only called for engines that support Graviton (MySQL, PostgreSQL, MariaDB).
+func (p *AWSPublicPlugin) getRDSGravitonRecommendation(
+	instanceType, engine, region string,
+) *pbc.Recommendation {
+	family, size := parseRDSInstanceType(instanceType)
+	if family == "" {
+		return nil
+	}
+
+	gravitonFamily, exists := rdsGravitonMap[family]
+	if !exists {
+		return nil
+	}
+
+	gravitonType := gravitonFamily + "." + size
+
+	currentPrice, found := p.pricing.RDSOnDemandPricePerHour(instanceType, engine)
+	if !found {
+		return nil
+	}
+
+	gravitonPrice, found := p.pricing.RDSOnDemandPricePerHour(gravitonType, engine)
+	if !found || gravitonPrice > currentPrice {
+		return nil
+	}
+
+	currentMonthly := currentPrice * hoursPerMonth
+	gravitonMonthly := gravitonPrice * hoursPerMonth
+	savings := currentMonthly - gravitonMonthly
+	savingsPercent := 0.0
+	if currentMonthly > 0 {
+		savingsPercent = (savings / currentMonthly) * 100
+	}
+
+	confidence := confidenceMedium
+	return &pbc.Recommendation{
+		Id:         uuid.New().String(),
+		Category:   pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_COST,
+		ActionType: pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_MODIFY,
+		Resource: &pbc.ResourceRecommendationInfo{
+			Provider:     providerAWS,
+			ResourceType: "rds",
+			Region:       region,
+			Sku:          instanceType,
+		},
+		ActionDetail: &pbc.Recommendation_Modify{
+			Modify: &pbc.ModifyAction{
+				ModificationType:  modTypeGraviton,
+				CurrentConfig:     map[string]string{"instance_type": instanceType, "engine": engine, "architecture": "x86_64"},
+				RecommendedConfig: map[string]string{"instance_type": gravitonType, "engine": engine, "architecture": "arm64"},
+			},
+		},
+		Impact: &pbc.RecommendationImpact{
+			EstimatedSavings:  savings,
+			Currency:          "USD",
+			ProjectionPeriod:  "monthly",
+			CurrentCost:       currentMonthly,
+			ProjectedCost:     gravitonMonthly,
+			SavingsPercentage: savingsPercent,
+		},
+		Priority:        pbc.RecommendationPriority_RECOMMENDATION_PRIORITY_LOW,
+		ConfidenceScore: &confidence,
+		Description: fmt.Sprintf("Migrate RDS %s from %s to %s (Graviton) for ~%.0f%% cost savings",
+			engine, instanceType, gravitonType, savingsPercent),
+		Reasoning: []string{
+			"Graviton RDS instances are typically ~20% cheaper with comparable performance",
+			fmt.Sprintf("Validated: %s engine supports Graviton architecture", engine),
+		},
+		Metadata: map[string]string{
+			"architecture_change": "x86_64 -> arm64",
+			"engine":              engine,
+		},
+		Source: sourceAWSPublic,
+	}
 }
 
 // matchesFilter checks if a resource matches the given filter criteria.

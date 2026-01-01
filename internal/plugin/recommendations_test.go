@@ -1508,3 +1508,192 @@ func TestGetRecommendations_Batch_EBSDefaultSize(t *testing.T) {
 		}
 	}
 }
+
+// TestExtractRDSEngine verifies engine extraction from tags with various formats.
+func TestExtractRDSEngine(t *testing.T) {
+	tests := []struct {
+		name     string
+		tags     map[string]string
+		expected string
+	}{
+		{"nil tags", nil, "mysql"},
+		{"empty tags", map[string]string{}, "mysql"},
+		{"explicit mysql", map[string]string{"engine": "mysql"}, "mysql"},
+		{"postgres alias", map[string]string{"engine": "postgres"}, "postgresql"},
+		{"postgresql", map[string]string{"engine": "postgresql"}, "postgresql"},
+		{"mariadb", map[string]string{"engine": "mariadb"}, "mariadb"},
+		{"oracle", map[string]string{"engine": "oracle"}, "oracle"},
+		{"sqlserver", map[string]string{"engine": "sqlserver"}, "sqlserver"},
+		{"capitalized Engine key", map[string]string{"Engine": "PostgreSQL"}, "postgresql"},
+		{"aurora-mysql", map[string]string{"engine": "aurora-mysql"}, "aurora-mysql"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractRDSEngine(tt.tags)
+			if got != tt.expected {
+				t.Errorf("extractRDSEngine(%v) = %q, want %q", tt.tags, got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestNormalizeRDSEngine verifies engine name normalization.
+func TestNormalizeRDSEngine(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"mysql", "mysql"},
+		{"MySQL", "mysql"},
+		{"postgres", "postgresql"},
+		{"PostgreSQL", "postgresql"},
+		{"POSTGRESQL", "postgresql"},
+		{"mariadb", "mariadb"},
+		{"MariaDB", "mariadb"},
+		{"oracle", "oracle"},
+		{"oracle-ee", "oracle"},
+		{"oracle-se2", "oracle"},
+		{"sqlserver", "sqlserver"},
+		{"sql-server", "sqlserver"},
+		{"sqlserver-ee", "sqlserver"},
+		{"aurora", "aurora-mysql"},
+		{"aurora-mysql", "aurora-mysql"},
+		{"aurora-postgresql", "aurora-postgresql"},
+		{"unknown-engine", "unknown-engine"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := normalizeRDSEngine(tt.input)
+			if got != tt.expected {
+				t.Errorf("normalizeRDSEngine(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestGetRecommendations_RDS_Batch verifies RDS recommendations in batch mode.
+func TestGetRecommendations_RDS_Batch(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	// Set up RDS pricing for generation upgrade test
+	mock.rdsInstancePrices["db.t2.medium/mysql"] = 0.068  // Old generation
+	mock.rdsInstancePrices["db.t3.medium/mysql"] = 0.068  // Same price, still recommend for better performance
+	mock.rdsInstancePrices["db.t4g.medium/mysql"] = 0.054 // Graviton, cheaper
+
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	req := &pbc.GetRecommendationsRequest{
+		TargetResources: []*pbc.ResourceDescriptor{
+			{
+				ResourceType: "aws:rds:Instance",
+				Sku:          "db.t2.medium",
+				Region:       "us-east-1",
+				Provider:     "aws",
+				Tags:         map[string]string{"engine": "mysql"},
+			},
+		},
+	}
+
+	resp, err := plugin.GetRecommendations(context.Background(), req)
+	if err != nil {
+		t.Fatalf("GetRecommendations() error: %v", err)
+	}
+
+	// db.t2 -> db.t3 generation upgrade should be recommended
+	// (Graviton may also be recommended if db.t4g pricing is cheaper)
+	if len(resp.Recommendations) < 1 {
+		t.Errorf("Expected at least 1 recommendation for RDS db.t2.medium, got %d", len(resp.Recommendations))
+	}
+
+	// Verify the recommendation has correct resource type
+	for _, rec := range resp.Recommendations {
+		if rec.Resource.ResourceType != "rds" {
+			t.Errorf("Expected resource type 'rds', got %q", rec.Resource.ResourceType)
+		}
+	}
+}
+
+// TestGetRecommendations_RDS_NoGravitonForOracle verifies Oracle doesn't get Graviton recommendations.
+func TestGetRecommendations_RDS_NoGravitonForOracle(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	// Set up pricing so Graviton would be cheaper
+	mock.rdsInstancePrices["db.m5.large/oracle"] = 0.475
+	mock.rdsInstancePrices["db.m6i.large/oracle"] = 0.450  // Generation upgrade target
+	mock.rdsInstancePrices["db.m6g.large/oracle"] = 0.400  // Would be cheaper if Oracle supported Graviton
+
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	req := &pbc.GetRecommendationsRequest{
+		TargetResources: []*pbc.ResourceDescriptor{
+			{
+				ResourceType: "rds",
+				Sku:          "db.m5.large",
+				Region:       "us-east-1",
+				Provider:     "aws",
+				Tags:         map[string]string{"engine": "oracle"},
+			},
+		},
+	}
+
+	resp, err := plugin.GetRecommendations(context.Background(), req)
+	if err != nil {
+		t.Fatalf("GetRecommendations() error: %v", err)
+	}
+
+	// Should only get generation upgrade, NOT Graviton (Oracle doesn't support it)
+	for _, rec := range resp.Recommendations {
+		modify := rec.GetModify()
+		if modify != nil && modify.ModificationType == "graviton_migration" {
+			t.Errorf("Should not recommend Graviton migration for Oracle engine")
+		}
+	}
+}
+
+// TestGetRecommendations_RDS_GravitonForMySQL verifies MySQL does get Graviton recommendations.
+func TestGetRecommendations_RDS_GravitonForMySQL(t *testing.T) {
+	mock := newMockPricingClient("us-east-1", "USD")
+	// Set up pricing so Graviton is cheaper
+	mock.rdsInstancePrices["db.t3.medium/mysql"] = 0.068
+	mock.rdsInstancePrices["db.t4g.medium/mysql"] = 0.054 // Graviton is cheaper
+
+	logger := zerolog.New(nil).Level(zerolog.InfoLevel)
+	plugin := NewAWSPublicPlugin("us-east-1", mock, logger)
+
+	req := &pbc.GetRecommendationsRequest{
+		TargetResources: []*pbc.ResourceDescriptor{
+			{
+				ResourceType: "rds",
+				Sku:          "db.t3.medium",
+				Region:       "us-east-1",
+				Provider:     "aws",
+				Tags:         map[string]string{"engine": "mysql"},
+			},
+		},
+	}
+
+	resp, err := plugin.GetRecommendations(context.Background(), req)
+	if err != nil {
+		t.Fatalf("GetRecommendations() error: %v", err)
+	}
+
+	// Should get Graviton recommendation for MySQL
+	hasGraviton := false
+	for _, rec := range resp.Recommendations {
+		modify := rec.GetModify()
+		if modify != nil && modify.ModificationType == "graviton_migration" {
+			hasGraviton = true
+			// Verify engine is preserved
+			if modify.RecommendedConfig["engine"] != "mysql" {
+				t.Errorf("Expected engine 'mysql' in recommended config, got %q", modify.RecommendedConfig["engine"])
+			}
+			break
+		}
+	}
+
+	if !hasGraviton {
+		t.Errorf("Expected Graviton recommendation for MySQL, but none found")
+	}
+}
