@@ -27,8 +27,8 @@ type AWSPublicPlugin struct {
 	carbonEstimator  carbon.CarbonEstimator
 	logger           zerolog.Logger // logger is immutable (copy-on-write)
 	testMode         bool           // true when PULUMICOST_TEST_MODE=true
-	maxBatchSize     int            // configured max batch size for recommendations
-	strictValidation bool           // fail-fast on invalid resources in recommendations
+	maxBatchSize     int            // configured max batch size for recommendations (read-only after init)
+	strictValidation bool           // fail-fast on invalid resources in recommendations (read-only after init)
 }
 
 // NewAWSPublicPlugin creates and returns a configured AWSPublicPlugin for the given AWS region.
@@ -41,7 +41,8 @@ type AWSPublicPlugin struct {
 //   - logger: logger used by the plugin for structured logs.
 //
 // Returns:
-//   A pointer to an initialized AWSPublicPlugin.
+//
+//	A pointer to an initialized AWSPublicPlugin.
 func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logger zerolog.Logger) *AWSPublicPlugin {
 	testMode := IsTestMode()
 
@@ -90,10 +91,10 @@ func NewAWSPublicPlugin(region string, pricingClient pricing.PricingClient, logg
 }
 
 // parseBoolEnv returns true if the environment variable is set to a truthy value.
-// Accepted values: "true", "1", "yes" (case-insensitive).
+// Accepted values: "true", "1", "yes", "on" (case-insensitive).
 func parseBoolEnv(key string) bool {
 	val := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
-	return val == "true" || val == "1" || val == "yes"
+	return val == "true" || val == "1" || val == "yes" || val == "on"
 }
 
 // getTraceID extracts the trace_id from context or generates a UUID if not present.
