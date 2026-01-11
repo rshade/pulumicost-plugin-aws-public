@@ -87,7 +87,7 @@ func run() error {
 	}
 
 	// Create plugin instance with logger
-	awsPlugin := plugin.NewAWSPublicPlugin(region, pricingClient, logger)
+	awsPlugin := plugin.NewAWSPublicPlugin(region, version, pricingClient, logger)
 
 	// Setup context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -101,6 +101,9 @@ func run() error {
 		logger.Info().Msg("received shutdown signal")
 		cancel()
 	}()
+
+	// Check if web serving is enabled (for browser/testing access)
+	webEnabled := os.Getenv("PULUMICOST_PLUGIN_WEB_ENABLED") == "true"
 
 	// Serve using pluginsdk
 	config := pluginsdk.ServeConfig{
@@ -117,6 +120,14 @@ func run() error {
 				"type":   "public-pricing-fallback",
 			},
 		},
+	}
+
+	// Enable web serving if requested (supports browser access via connect-go)
+	if webEnabled {
+		config.Web = pluginsdk.WebConfig{
+			Enabled: true,
+		}
+		logger.Info().Msg("web serving enabled with multi-protocol support")
 	}
 	if err := pluginsdk.Serve(ctx, config); err != nil {
 		logger.Error().Err(err).Msg("server error")
