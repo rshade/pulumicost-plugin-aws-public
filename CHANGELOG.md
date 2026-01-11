@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.17](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.16...v0.0.17) (2026-01-11)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/goccy/go-yaml to v1.19.2 ([#231](https://github.com/rshade/pulumicost-plugin-aws-public/issues/231)) ([cff3b0e](https://github.com/rshade/pulumicost-plugin-aws-public/commit/cff3b0e4b02400f9ba376127b78692200255f168))
+* **deps:** update module github.com/rshade/pulumicost-plugin-aws-public to v0.0.16 ([#232](https://github.com/rshade/pulumicost-plugin-aws-public/issues/232)) ([023bf21](https://github.com/rshade/pulumicost-plugin-aws-public/commit/023bf212114b78931222b5b236d7ac0a066a44fe))
+* **deps:** update module github.com/rshade/pulumicost-spec to v0.4.14 ([#236](https://github.com/rshade/pulumicost-plugin-aws-public/issues/236)) ([97a946e](https://github.com/rshade/pulumicost-plugin-aws-public/commit/97a946e61aa5620e3f8ee9a8ee9177809d25f08d))
+
 ## [0.0.16](https://github.com/rshade/pulumicost-plugin-aws-public/compare/v0.0.15...v0.0.16) (2026-01-08)
 
 
