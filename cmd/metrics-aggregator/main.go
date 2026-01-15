@@ -24,6 +24,10 @@ var httpClient = &http.Client{
 	},
 }
 
+// main starts the metrics aggregator HTTP server.
+// It registers an endpoint for Prometheus metrics ("/metrics") and an aggregated metrics endpoint ("/metrics/aggregated"),
+// begins listening on the configured address, and performs a graceful shutdown when SIGINT or SIGTERM is received using a 10-second timeout.
+// The function logs startup information and exits on unrecoverable server errors.
 func main() {
 	config := parseConfig()
 
@@ -60,6 +64,17 @@ func main() {
 	<-shutdownDone
 }
 
+// aggregatedMetricsHandler collects Prometheus metrics from a range of local ports and writes the concatenated result to the HTTP response.
+//
+// aggregatedMetricsHandler creates a context with the timeout specified by config.Timeout, then iterates from config.StartPort to config.EndPort,
+// attempting to fetch /metrics from each localhost port. Metrics successfully retrieved are appended (separated by newlines) and served with
+// Content-Type "text/plain; charset=utf-8". If fetching metrics for a specific port fails, the error is logged and the handler continues with the next port.
+// If writing to the response fails, the error is logged and the handler returns.
+//
+// Parameters:
+//  - w: the http.ResponseWriter used to write the aggregated metrics response.
+//  - r: the incoming HTTP request (unused except for context lifecycle).
+//  - config: configuration specifying StartPort, EndPort, and Timeout used for collection.
 func aggregatedMetricsHandler(w http.ResponseWriter, r *http.Request, config *Config) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
@@ -89,6 +104,12 @@ func aggregatedMetricsHandler(w http.ResponseWriter, r *http.Request, config *Co
 	}
 }
 
+// fetchMetrics fetches the Prometheus metrics text from the local /metrics endpoint on the given port.
+// 
+// The ctx controls the request lifetime. The port selects the localhost TCP port to query.
+// 
+// It returns the response body as a string containing the metrics exposition on success, or an error
+// if the request fails, the response status is not 200 OK, or the response body cannot be read.
 func fetchMetrics(ctx context.Context, port int) (string, error) {
 	url := fmt.Sprintf("http://localhost:%d/metrics", port)
 
