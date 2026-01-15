@@ -1,0 +1,21 @@
+.git
+node_modules
+dist
+bin
+data/*.json
+!data/aws_pricing_fallback.json
+internal/carbon/data/*.json
+test
+docs
+specs
+*.md
+.github
+.coderabbit.yaml
+.goreleaser.yaml
+Makefile
+# Docker/build artifacts
+*.log*
+.env*
+coverage/
+# Don't ignore go.mod/sum in build context if we want to use them for caching
+# But we copy the whole context usually. Actually for multi-stage build it is better to copy them separately.

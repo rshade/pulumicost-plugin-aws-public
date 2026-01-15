@@ -1753,6 +1753,36 @@ func (p *AWSPublicPlugin) estimateElastiCache(traceID string, resource *pbc.Reso
 		BillingDetail: billingDetail,
 	}
 
+	// Carbon estimation for ElastiCache cluster
+	elasticacheEstimator := carbon.NewElastiCacheEstimator()
+	carbonGrams, carbonOK := elasticacheEstimator.EstimateCarbonGrams(carbon.ElastiCacheConfig{
+		NodeType:    nodeType,
+		Engine:      engine,
+		Nodes:       numNodes,
+		Region:      resource.Region,
+		Utilization: carbon.DefaultUtilization, // Use CCF default (50%)
+		Hours:       carbon.HoursPerMonth,
+	})
+
+	if carbonOK {
+		resp.ImpactMetrics = []*pbc.ImpactMetric{
+			{
+				Kind:  pbc.MetricKind_METRIC_KIND_CARBON_FOOTPRINT,
+				Value: carbonGrams,
+				Unit:  "gCO2e",
+			},
+		}
+
+		p.logger.Debug().
+			Str(pluginsdk.FieldTraceID, traceID).
+			Str(pluginsdk.FieldOperation, "GetProjectedCost").
+			Str("node_type", nodeType).
+			Int("num_nodes", numNodes).
+			Str("aws_region", resource.Region).
+			Float64("carbon_grams", carbonGrams).
+			Msg("ElastiCache carbon estimation successful")
+	}
+
 	// Apply growth hint enrichment
 	setGrowthHint(p.logger.With().Str(pluginsdk.FieldTraceID, traceID).Logger(), "aws:elasticache:cluster", resp)
 

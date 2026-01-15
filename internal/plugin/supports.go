@@ -78,8 +78,8 @@ func (p *AWSPublicPlugin) Supports(ctx context.Context, req *pbc.SupportsRequest
 
 	// Check resource type
 	switch normalizedType {
-	case "ec2":
-		// EC2 fully supported with carbon estimation
+	case "ec2", "rds", "lambda", "s3", "ebs", "eks", "dynamodb", "elasticache":
+		// These services support both cost and carbon estimation
 		supportedMetrics := getSupportedMetrics(normalizedType)
 		p.logger.Info().
 			Str(pluginsdk.FieldTraceID, traceID).
@@ -97,7 +97,7 @@ func (p *AWSPublicPlugin) Supports(ctx context.Context, req *pbc.SupportsRequest
 			SupportedMetrics: supportedMetrics,
 		}, nil
 
-	case "ebs", "rds", "eks", "s3", "lambda", "dynamodb", "elb", "natgw", "cloudwatch", "elasticache":
+	case "elb", "natgw", "cloudwatch":
 		// Supported but no carbon estimation yet
 		p.logger.Info().
 			Str(pluginsdk.FieldTraceID, traceID).
@@ -144,8 +144,8 @@ func (p *AWSPublicPlugin) Supports(ctx context.Context, req *pbc.SupportsRequest
 // supported for that resource type.
 func getSupportedMetrics(resourceType string) []pbc.MetricKind {
 	switch resourceType {
-	case "ec2":
-		// EC2 supports carbon footprint estimation via CCF data
+	case "ec2", "rds", "lambda", "s3", "ebs", "eks", "dynamodb", "elasticache":
+		// These services now support carbon footprint estimation
 		return []pbc.MetricKind{pbc.MetricKind_METRIC_KIND_CARBON_FOOTPRINT}
 	default:
 		// Other resource types don't have additional metrics yet
