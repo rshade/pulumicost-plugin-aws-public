@@ -70,7 +70,11 @@ func main() {
 // aggregatedMetricsHandler creates a context with the timeout specified by config.Timeout, then iterates from config.StartPort to config.EndPort,
 // attempting to fetch /metrics from each localhost port. Metrics successfully retrieved are appended (separated by newlines) and served with
 // Content-Type "text/plain; charset=utf-8". If fetching metrics for a specific port fails, the error is logged and the handler continues with the next port.
-// If writing to the response fails, the error is logged and the handler returns.
+//
+// Error Handling:
+// If more than 50% of regions fail to respond (success_count < total_regions / 2),
+// the handler returns HTTP 503 (Service Unavailable) to alert monitoring systems of degraded state.
+// Partial metrics are still returned in this case so operators can investigate.
 //
 // Parameters:
 //  - w: the http.ResponseWriter used to write the aggregated metrics response.
@@ -82,6 +86,8 @@ func aggregatedMetricsHandler(w http.ResponseWriter, r *http.Request, config *Co
 	defer cancel()
 
 	var allMetrics strings.Builder
+	successCount := 0
+	totalRegions := config.EndPort - config.StartPort + 1
 
 	for port := config.StartPort; port <= config.EndPort; port++ {
 		metrics, err := fetchMetrics(ctx, port, httpClient)
@@ -89,11 +95,19 @@ func aggregatedMetricsHandler(w http.ResponseWriter, r *http.Request, config *Co
 			log.Error().Err(err).Int("port", port).Msg("Failed to fetch metrics")
 			continue
 		}
+		successCount++
 		allMetrics.WriteString(metrics)
 		allMetrics.WriteString("\n")
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
+	// Return HTTP 503 if more than 50% of regions failed
+	if successCount*2 < totalRegions {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		log.Warn().Int("success", successCount).Int("total", totalRegions).Msg("Metrics aggregation degraded: >50% of regions failed")
+	}
+
 	if _, err := w.Write([]byte(allMetrics.String())); err != nil {
 		log.Error().Err(err).Msg("Failed to write response")
 		return

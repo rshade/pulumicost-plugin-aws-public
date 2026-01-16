@@ -135,12 +135,15 @@ func (p *AWSPublicPlugin) Supports(ctx context.Context, req *pbc.SupportsRequest
 }
 
 // getSupportedMetrics returns the list of supported metric kinds for a given resource type.
-// Currently, only EC2 supports carbon footprint estimation via METRIC_KIND_CARBON_FOOTPRINT.
+// Currently, EC2 and ElastiCache support carbon footprint estimation via METRIC_KIND_CARBON_FOOTPRINT.
 // resourceType is the normalized resource type (e.g., "ec2", "rds", "lambda", "s3", "ebs", "eks", "dynamodb", "elasticache").
 func getSupportedMetrics(resourceType string) []pbc.MetricKind {
 	switch resourceType {
 	case "ec2":
-		// EC2 supports carbon footprint estimation
+		// EC2 instances support carbon footprint estimation (compute + embodied carbon)
+		return []pbc.MetricKind{pbc.MetricKind_METRIC_KIND_CARBON_FOOTPRINT}
+	case "elasticache":
+		// ElastiCache clusters support carbon footprint estimation (node carbon × cluster size)
 		return []pbc.MetricKind{pbc.MetricKind_METRIC_KIND_CARBON_FOOTPRINT}
 	default:
 		// Other resource types don't report carbon footprint metrics yet

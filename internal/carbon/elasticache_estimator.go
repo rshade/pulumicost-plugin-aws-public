@@ -35,8 +35,10 @@ func (e *ElastiCacheEstimator) EstimateCarbonGrams(config ElastiCacheConfig) (fl
 	// Convert ElastiCache node type to EC2 equivalent (cache.m5.large -> m5.large)
 	ec2InstanceType := elasticacheToEC2InstanceType(config.NodeType)
 
-	// Calculate compute carbon using a fresh EC2 estimator with GPU disabled.
-	// ElastiCache nodes don't have GPUs.
+	// Calculate compute carbon using a fresh EC2 estimator.
+	// Set IncludeGPU to false explicitly (defensive programming):
+	// ElastiCache nodes are CPU-only and never have GPUs,
+	// so we ensure GPU carbon is excluded even if the default changes in the future.
 	ec2Estimator := NewEstimator()
 	ec2Estimator.IncludeGPU = false
 	nodeCarbon, ok := ec2Estimator.EstimateCarbonGrams(

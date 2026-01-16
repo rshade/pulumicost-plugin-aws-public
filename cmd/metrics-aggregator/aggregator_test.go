@@ -45,9 +45,7 @@ func TestFetchMetrics(t *testing.T) {
 }
 
 func TestAggregatedMetricsHandler(t *testing.T) {
-	// Since the handler fetches from real ports, we'll test with a mock by using httptest.Server
-	// but adjusting the port. For simplicity, test the handler structure without real network calls.
-
+	// Test the handler with unavailable regions (expected to return 503 due to >50% failure)
 	config := &Config{
 		StartPort:  8001,
 		EndPort:    8001,
@@ -65,8 +63,9 @@ func TestAggregatedMetricsHandler(t *testing.T) {
 	aggregatedMetricsHandler(w, req, config, httpClient)
 
 	resp := w.Result()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+	// When all regions fail (1 region, 0 successes), handler returns 503
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("Expected status 503 for all region failures, got %d", resp.StatusCode)
 	}
 
 	body := w.Body.String()

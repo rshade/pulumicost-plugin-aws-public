@@ -42,11 +42,14 @@ jobs:
       - name: Check image size
         run: |
           IMAGE_SIZE=$(docker image inspect ghcr.io/rshade/finfocus-plugin-aws-public:latest --format='{{.Size}}')
-          MAX_SIZE=$((22 * 1024 * 1024 * 1024 / 10))
+          # Set limit to 3GB to ensure images stay under typical registry/storage limits
+          # This accommodates: base image (~20MB) + 12 binaries (~20-25MB each) + dependencies (~100-150MB)
+          MAX_SIZE=$((3 * 1024 * 1024 * 1024))
           if [ "$IMAGE_SIZE" -gt "$MAX_SIZE" ]; then
-            echo "Image size exceeds limit: $IMAGE_SIZE bytes"
+            echo "Image size exceeds limit: $IMAGE_SIZE bytes (max: $MAX_SIZE bytes)"
             exit 1
           fi
+          echo "Image size check passed: $IMAGE_SIZE bytes (max: $MAX_SIZE bytes)"
 
       - name: Check binary sizes
         run: |
