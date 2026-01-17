@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/rshade/finfocus-plugin-aws-public/compare/v0.1.1...v0.1.2) (2026-01-17)
+
+
+### Documentation
+
+* add missing docstrings and carbon estimation documentation ([#268](https://github.com/rshade/finfocus-plugin-aws-public/issues/268)) ([b49bb46](https://github.com/rshade/finfocus-plugin-aws-public/commit/b49bb4608aba820d8748069abf11bf115ca02f12)), closes [#225](https://github.com/rshade/finfocus-plugin-aws-public/issues/225) [#226](https://github.com/rshade/finfocus-plugin-aws-public/issues/226) [#254](https://github.com/rshade/finfocus-plugin-aws-public/issues/254) [#255](https://github.com/rshade/finfocus-plugin-aws-public/issues/255) [#256](https://github.com/rshade/finfocus-plugin-aws-public/issues/256)
+
 ## [0.1.1](https://github.com/rshade/finfocus-plugin-aws-public/compare/v0.1.0...v0.1.1) (2026-01-16)
 
 
