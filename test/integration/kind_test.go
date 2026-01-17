@@ -13,6 +13,28 @@ import (
 
 const imageName = "finfocus-aws:test"
 
+// TestKubernetesDeploymentWithKind verifies the plugin deploys and runs correctly on a local Kubernetes cluster.
+//
+// This test validates end-to-end Kubernetes deployment, including cluster creation,
+// image loading, pod readiness, port forwarding, and health endpoint verification.
+// It ensures the containerized plugin integrates correctly with Kubernetes orchestration.
+//
+// Test workflow:
+//  1. Check if kind and kubectl CLIs are available (skip if not)
+//  2. Create a Kind cluster (test-aws-cluster)
+//  3. Load the finfocus-aws Docker image into the cluster
+//  4. Deploy the application using kubectl apply on test/k8s/deployment.yaml
+//  5. Wait for pod to be Running and Ready (2 minute timeout)
+//  6. Set up port forwarding (8001:8001, 9090:9090)
+//  7. Verify health endpoint responds via port-forward
+//  8. Cleanup: delete the Kind cluster
+//
+// Prerequisites:
+//   - kind CLI available and accessible in PATH
+//   - kubectl CLI available and accessible in PATH
+//   - Docker image finfocus-aws:test already built and available locally
+//
+// Run with: go test -tags=integration -run TestKubernetesDeploymentWithKind ./test/integration/...
 func TestKubernetesDeploymentWithKind(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")

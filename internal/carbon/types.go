@@ -28,6 +28,18 @@ type EmbodiedCarbonConfig struct {
 
 // DefaultEmbodiedCarbonConfig returns the default embodied carbon configuration
 // based on CCF methodology.
+//
+// Embodied carbon is disabled by default for several reasons:
+//   - Conservative estimates: Only operational carbon is reported by default since it can
+//     be measured with higher confidence (actual power consumption × grid factor)
+//   - Comparability: Most carbon calculators (AWS Customer Carbon Footprint Tool, Google)
+//     report only operational (Scope 2) emissions, making comparison easier
+//   - User expectation: Enterprise users typically expect operational-only baselines
+//   - Uncertainty: Embodied carbon values (1000 kgCO2e/server) are rough estimates that
+//     vary significantly by manufacturer and server configuration
+//
+// To include embodied carbon, set Enabled: true in the configuration.
+// See docs/carbon-estimation.md for more details on enabling embodied carbon.
 func DefaultEmbodiedCarbonConfig() EmbodiedCarbonConfig {
 	return EmbodiedCarbonConfig{
 		Enabled:                 false,

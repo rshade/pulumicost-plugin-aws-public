@@ -51,7 +51,10 @@ func (e *RDSEstimator) EstimateCarbonGrams(config RDSInstanceConfig) (float64, b
 		Hours:      config.Hours,
 	})
 
-	// Apply Multi-AZ multiplier (2× for both compute and storage)
+	// Apply Multi-AZ multiplier (2× for both compute and storage).
+	// Note: This assumes both AZs are in the same region with identical grid factors.
+	// Cross-region deployments (if applicable) may have different carbon footprints
+	// due to varying grid intensities between regions.
 	totalCarbon := computeCarbon + storageCarbon
 	if config.MultiAZ {
 		totalCarbon *= 2
@@ -87,7 +90,7 @@ func (e *RDSEstimator) EstimateCarbonGramsWithBreakdown(config RDSInstanceConfig
 		Hours:      config.Hours,
 	})
 
-	// Apply Multi-AZ multiplier
+	// Apply Multi-AZ multiplier (same-region assumption, see EstimateCarbonGrams).
 	if config.MultiAZ {
 		computeCarbon *= 2
 		storageCarbon *= 2

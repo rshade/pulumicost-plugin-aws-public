@@ -69,9 +69,8 @@ func (e *ElastiCacheEstimator) GetBillingDetail(config ElastiCacheConfig) string
 		formatInt(int(config.Utilization*100)) + "% utilization"
 }
 
-// elasticacheToEC2InstanceType converts an ElastiCache node type to its EC2 equivalent.
-// elasticacheToEC2InstanceType returns the EC2-equivalent instance type for an ElastiCache node type by removing the leading "cache." prefix if present.
-// If the input does not have that prefix, it is returned unchanged.
+// elasticacheToEC2InstanceType converts an ElastiCache node type to its EC2 equivalent
+// by removing the "cache." prefix (e.g., "cache.m5.large" -> "m5.large").
 func elasticacheToEC2InstanceType(nodeType string) string {
 	return strings.TrimPrefix(nodeType, "cache.")
 }
