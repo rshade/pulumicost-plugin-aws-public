@@ -238,15 +238,51 @@ Higher utilization = more power consumption = more carbon.
 Embodied carbon represents the manufacturing emissions of hardware, amortized
 over the expected server lifespan (48 months).
 
+### Why Disabled by Default
+
+Embodied carbon is **disabled by default** for several reasons:
+
+1. **Conservative estimates**: Only operational carbon is reported by default since it
+   can be measured with higher confidence (actual power consumption × grid factor)
+2. **Comparability**: Most carbon calculators (AWS Customer Carbon Footprint Tool,
+   Google Cloud Carbon Footprint) report only operational (Scope 2) emissions,
+   making comparison easier
+3. **User expectation**: Enterprise users typically expect operational-only baselines
+4. **Uncertainty**: Embodied carbon values (1000 kgCO2e/server) are rough estimates
+   that vary significantly by manufacturer and server configuration
+
+### Enabling Embodied Carbon
+
+To include embodied carbon in estimates, set `IncludeEmbodiedCarbon: true` in the
+EC2InstanceConfig:
+
+```go
+config := carbon.EC2InstanceConfig{
+    InstanceType:          "m5.large",
+    Region:                "us-east-1",
+    IncludeEmbodiedCarbon: true,
+    EmbodiedConfig: carbon.EmbodiedCarbonConfig{
+        Enabled:                 true,
+        ServerLifespanMonths:    48,   // 4 years (default)
+        EmbodiedCarbonPerServer: 1000, // kgCO2e (default)
+    },
+}
+```
+
+### Supported Services
+
 Currently supported for:
 
 - EC2 instances (using CCF methodology: 1000 kgCO2e per server)
 
-Formula:
+### Formula
 
 ```text
 monthlyEmbodiedCarbon = (1000 kgCO2e / 48 months) × (instanceVCPUs / maxFamilyVCPUs)
 ```
+
+The vCPU scaling factor accounts for shared server resources—a smaller instance
+consumes a proportionally smaller share of the server's embodied carbon.
 
 ## Limitations
 
@@ -255,6 +291,18 @@ monthlyEmbodiedCarbon = (1000 kgCO2e / 48 months) × (instanceVCPUs / maxFamilyV
 3. **Steady-state**: Assumes constant utilization over the period
 4. **Grid factors**: Updated annually; may lag real-world grid changes
 5. **EKS control plane**: Returns 0 (shared infrastructure)
+
+### RDS Multi-AZ Limitations
+
+Multi-AZ carbon calculation uses a 2× multiplier assuming same-region deployment
+where both availability zones share the same grid emission factor. Cross-region
+Multi-AZ deployments (if applicable) may have different actual carbon footprints
+due to varying grid intensities between regions.
+
+Regional grid factors can vary significantly—up to 80× between eu-north-1 (Sweden,
+hydro) and ap-south-1 (Mumbai, coal). If AWS ever supports cross-region Multi-AZ
+for RDS, this assumption would need to be revisited to use region-specific grid
+factors for each replica.
 
 ## Data Sources
 

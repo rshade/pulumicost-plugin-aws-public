@@ -18,6 +18,28 @@ const (
 	testVersion = "v0.0.3"
 )
 
+// TestDockerImageBuildAndVerification verifies Docker image build and runtime validation.
+//
+// This test validates that the multi-region Docker image builds correctly and all
+// regional binaries are embedded and executable. It also verifies that the metrics
+// aggregator builds and runs within the container, and that health/metrics endpoints
+// function correctly.
+//
+// Test workflow:
+//  1. Build Docker image with VERSION build arg (v0.0.3)
+//  2. Verify image size is within expected range (1GB-3GB)
+//  3. Run container with port mappings (8001-8012 for regions, 9090 for metrics)
+//  4. Wait for container health checks to pass (2 minute timeout)
+//  5. Verify health endpoint responds at localhost:8001/healthz
+//  6. Verify metrics endpoint responds at localhost:9090/metrics with Prometheus format
+//  7. Verify container logs contain injected region field ("region":"us-east-1")
+//  8. Cleanup: remove container
+//
+// Prerequisites:
+//   - Docker daemon running and accessible
+//   - Dockerfile located at docker/Dockerfile relative to project root
+//
+// Run with: go test -tags=integration -run TestDockerImageBuildAndVerification ./test/integration/...
 func TestDockerImageBuildAndVerification(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
