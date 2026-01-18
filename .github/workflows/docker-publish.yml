@@ -1,13 +1,21 @@
 name: Docker Publish
 
 on:
-  release:
-    types: [created]
+  workflow_run:
+    workflows: ["GoReleaser"]
+    types: [completed]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g., v0.1.0)'
+        required: true
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Only run if GoReleaser succeeded (or if manually triggered)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout
@@ -25,9 +33,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker image
+      - name: Determine version
+        id: version
         run: |
-          VERSION=${{ github.event.release.tag_name || 'v0.1.0' }}
+          # Priority: workflow_dispatch input > workflow_run head_branch > fallback
+          if [ -n "${{ inputs.tag }}" ]; then
+            VERSION="${{ inputs.tag }}"
+          elif [ -n "${{ github.event.workflow_run.head_branch }}" ]; then
+            VERSION="${{ github.event.workflow_run.head_branch }}"
+          else
+            VERSION="v0.1.0"
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Detected version: ${VERSION}"
+
+      - name: Build Docker image
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
           docker build \
             --build-arg VERSION=${VERSION} \
             -t ghcr.io/rshade/finfocus-plugin-aws-public:latest \
@@ -60,6 +83,8 @@ jobs:
           done
 
       - name: Push Docker image
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           docker push ghcr.io/rshade/finfocus-plugin-aws-public:latest
-          docker push ghcr.io/rshade/finfocus-plugin-aws-public:${{ github.event.release.tag_name || 'v0.1.0' }}
+          docker push ghcr.io/rshade/finfocus-plugin-aws-public:${VERSION}
