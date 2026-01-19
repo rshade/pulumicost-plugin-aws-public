@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/rshade/finfocus-plugin-aws-public/compare/v0.1.3...v0.1.4) (2026-01-19)
+
+
+### Features
+
+* **region:** add us-west-1 (N. California) region support ([#278](https://github.com/rshade/finfocus-plugin-aws-public/issues/278)) ([3f1582e](https://github.com/rshade/finfocus-plugin-aws-public/commit/3f1582ef36646a65dce3e6eaaff38ad28c9c9364)), closes [#273](https://github.com/rshade/finfocus-plugin-aws-public/issues/273)
+
 ## [0.1.3](https://github.com/rshade/finfocus-plugin-aws-public/compare/v0.1.2...v0.1.3) (2026-01-18)
 
 
