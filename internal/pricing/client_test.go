@@ -761,3 +761,174 @@ func TestClient_NATGatewayPrice(t *testing.T) {
 		}
 	}
 }
+
+// TestClient_parseEC2Pricing_Logic tests the EC2 pricing parsing logic with controlled input.
+//
+// Purpose: Validates that the parseEC2Pricing method correctly parses minimal EC2 pricing
+// data, extracts region information, metadata, and indexes pricing data.
+//
+// Workflow:
+//  1. Setup: Create minimal valid EC2 JSON payload and initialize client with empty indexes
+//  2. Action: Call parseEC2Pricing method with the test JSON data
+//  3. Assertions: Verify region detection, metadata extraction, and price indexing
+//
+// Prerequisites: Minimal valid EC2 JSON payload with products and terms sections.
+//
+// Run command: go test -run TestClient_parseEC2Pricing_Logic
+func TestClient_parseEC2Pricing_Logic(t *testing.T) {
+	// Minimal valid EC2 JSON
+	jsonData := []byte(`{
+		"formatVersion": "v1.0",
+		"offerCode": "AmazonEC2",
+		"version": "test-version",
+		"publicationDate": "2025-01-01T00:00:00Z",
+		"products": {
+			"SKU_TEST": {
+				"sku": "SKU_TEST",
+				"productFamily": "Compute Instance",
+				"attributes": {
+					"instanceType": "test.type",
+					"operatingSystem": "Linux",
+					"tenancy": "Shared",
+					"regionCode": "us-test-1",
+					"capacitystatus": "Used",
+					"preInstalledSw": "NA"
+				}
+			}
+		},
+		"terms": {
+			"OnDemand": {
+				"SKU_TEST": {
+					"SKU_TEST.OFFER": {
+						"offerTermCode": "OFFER",
+						"sku": "SKU_TEST",
+						"priceDimensions": {
+							"SKU_TEST.OFFER.RATE": {
+								"rateCode": "SKU_TEST.OFFER.RATE",
+								"unit": "Hrs",
+								"pricePerUnit": { "USD": "1.2345" }
+							}
+						}
+					}
+				}
+			}
+		}
+	}`)
+
+	// Create a client with NO initialization to avoid parsing embedded data
+	client := &Client{
+		logger:           zerolog.Nop(),
+		ec2Index:         make(map[string]ec2Price),
+		ebsIndex:         make(map[string]ebsPrice),
+		rdsInstanceIndex: make(map[string]rdsInstancePrice),
+		rdsStorageIndex:  make(map[string]rdsStoragePrice),
+		s3Index:          make(map[string]s3Price),
+	}
+
+	// Call the private parser directly
+	// Note: internal/pricing package allows access to unexported methods in test
+	region, meta, err := client.parseEC2Pricing(jsonData)
+	if err != nil {
+		t.Fatalf("parseEC2Pricing failed: %v", err)
+	}
+
+	// Verify region detection
+	if region != "us-test-1" {
+		t.Errorf("expected region 'us-test-1', got '%s'", region)
+	}
+
+	// Verify metadata
+	if meta.Version != "test-version" {
+		t.Errorf("expected version 'test-version', got '%s'", meta.Version)
+	}
+	if meta.OfferCode != "AmazonEC2" {
+		t.Errorf("expected offerCode 'AmazonEC2', got '%s'", meta.OfferCode)
+	}
+
+	// Verify price was indexed
+	key := "test.type/Linux/Shared"
+	price, found := client.ec2Index[key]
+	if !found {
+		t.Fatalf("price for %s not found in index", key)
+	}
+	if price.HourlyRate != 1.2345 {
+		t.Errorf("expected price 1.2345, got %v", price.HourlyRate)
+	}
+}
+
+// TestClient_parseELBPricing_Logic tests the ELB pricing parsing logic with controlled input.
+//
+// Purpose: Validates that the parseELBPricing method correctly parses minimal ELB pricing
+// data, extracts region information, and populates ELB pricing structure.
+//
+// Workflow:
+//  1. Setup: Create minimal valid ELB JSON payload and initialize client
+//  2. Action: Call parseELBPricing method with the test JSON data
+//  3. Assertions: Verify region detection and ELB pricing data population
+//
+// Prerequisites: Minimal valid ELB JSON payload with products and terms sections.
+//
+// Run command: go test -run TestClient_parseELBPricing_Logic
+func TestClient_parseELBPricing_Logic(t *testing.T) {
+	// Minimal valid ELB JSON
+	jsonData := []byte(`{
+		"formatVersion": "v1.0",
+		"offerCode": "AWSELB",
+		"products": {
+			"SKU_ALB": {
+				"sku": "SKU_ALB",
+				"productFamily": "Load Balancer-Application",
+				"attributes": {
+					"regionCode": "us-test-1",
+					"usagetype": "LoadBalancerUsage"
+				}
+			}
+		},
+		"terms": {
+			"OnDemand": {
+				"SKU_ALB": {
+					"SKU_ALB.OFFER": {
+						"priceDimensions": {
+							"SKU_ALB.OFFER.RATE": {
+								"unit": "Hrs",
+								"pricePerUnit": { "USD": "0.0225" }
+							}
+						}
+					}
+				}
+			}
+		}
+	}`)
+
+	client := &Client{
+		logger: zerolog.Nop(),
+		// elbPricing is nil initially
+	}
+
+	// Call private parser
+	region, err := client.parseELBPricing(jsonData)
+	if err != nil {
+		t.Fatalf("parseELBPricing failed: %v", err)
+	}
+
+	if region != "us-test-1" {
+		t.Errorf("expected region 'us-test-1', got '%s'", region)
+	}
+
+	if client.elbPricing == nil {
+		t.Fatal("elbPricing is nil after parsing")
+	}
+
+	if client.elbPricing.ALBHourlyRate != 0.0225 {
+		t.Errorf("expected ALB hourly 0.0225, got %v", client.elbPricing.ALBHourlyRate)
+	}
+	if client.elbPricing.ALBLCURate != 0 {
+		t.Errorf("expected ALB LCU 0, got %v", client.elbPricing.ALBLCURate)
+	}
+	if client.elbPricing.NLBHourlyRate != 0 {
+		t.Errorf("expected NLB hourly 0, got %v", client.elbPricing.NLBHourlyRate)
+	}
+	if client.elbPricing.NLBNLCURate != 0 {
+		t.Errorf("expected NLB NLCU 0, got %v", client.elbPricing.NLBNLCURate)
+	}
+}
