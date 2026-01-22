@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.4](https://github.com/rshade/finfocus-plugin-aws-public/compare/v0.1.3...v0.1.4) (2026-01-19)
+
+
+### Features
+
+* **plugin:** add IAM resources to zero-cost handling ([#284](https://github.com/rshade/finfocus-plugin-aws-public/issues/284)) ([07a5481](https://github.com/rshade/finfocus-plugin-aws-public/commit/07a5481e5199403da04937ed14361eceb6cf4126)), closes [#274](https://github.com/rshade/finfocus-plugin-aws-public/issues/274)
+* **region:** add us-west-1 (N. California) region support ([#278](https://github.com/rshade/finfocus-plugin-aws-public/issues/278)) ([3f1582e](https://github.com/rshade/finfocus-plugin-aws-public/commit/3f1582ef36646a65dce3e6eaaff38ad28c9c9364)), closes [#273](https://github.com/rshade/finfocus-plugin-aws-public/issues/273)
+
+
+### Bug Fixes
+
+* adding in new test patterns ([#282](https://github.com/rshade/finfocus-plugin-aws-public/issues/282)) ([a856d77](https://github.com/rshade/finfocus-plugin-aws-public/commit/a856d778f96f2f5cf1a364c970f44a914b735e50))
+
 ## [0.1.3](https://github.com/rshade/finfocus-plugin-aws-public/compare/v0.1.2...v0.1.3) (2026-01-18)
 
 
